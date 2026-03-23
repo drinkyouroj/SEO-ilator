@@ -38,9 +38,9 @@ describe("DataTable", () => {
     expect(screen.getByText("Name")).toBeDefined();
     expect(screen.getByText("Score")).toBeDefined();
 
-    // Row data
-    expect(screen.getByText("Article A")).toBeDefined();
-    expect(screen.getByText("Article B")).toBeDefined();
+    // Row data (appears in both desktop table and mobile cards)
+    expect(screen.getAllByText("Article A").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Article B").length).toBeGreaterThan(0);
     expect(screen.getByText("85")).toBeDefined();
     expect(screen.getByText("72")).toBeDefined();
   });
