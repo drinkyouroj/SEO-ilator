@@ -57,7 +57,7 @@ export async function requireAuth(): Promise<{
 export async function getCurrentUser() {
   const { userId } = await requireAuth();
 
-  const user = await prisma.user.findUniqueOrThrow({
+  const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
       projects: {
@@ -67,12 +67,19 @@ export async function getCurrentUser() {
     },
   });
 
+  if (!user) {
+    throw new Response(
+      JSON.stringify({ error: "User not found. Please sign in again." }),
+      { status: 401, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   const project = user.projects[0];
   if (!project) {
-    throw new Response(JSON.stringify({ error: "No project found." }), {
-      status: 403,
-      headers: { "Content-Type": "application/json" },
-    });
+    throw new Response(
+      JSON.stringify({ error: "No project found. Please contact support." }),
+      { status: 403, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   return { ...user, project };

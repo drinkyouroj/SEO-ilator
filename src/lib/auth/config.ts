@@ -52,17 +52,26 @@ export const authConfig: NextAuthConfig = {
       if (!user.id) return true;
 
       // Auto-create a default Project on first login
-      const existingProject = await prisma.project.findFirst({
-        where: { userId: user.id },
-      });
-
-      if (!existingProject) {
-        await prisma.project.create({
-          data: {
-            userId: user.id,
-            name: "My First Project",
-          },
+      try {
+        const existingProject = await prisma.project.findFirst({
+          where: { userId: user.id },
         });
+
+        if (!existingProject) {
+          await prisma.project.create({
+            data: {
+              userId: user.id,
+              name: "My First Project",
+            },
+          });
+        }
+      } catch (error) {
+        console.error("[auth/signIn] Failed to create default project:", {
+          userId: user.id,
+          error,
+        });
+        // Fail the sign-in so the user is not left in an unusable state
+        return false;
       }
 
       return true;
@@ -75,8 +84,17 @@ export const authConfig: NextAuthConfig = {
         orderBy: { createdAt: "asc" },
       });
 
+      if (!project) {
+        console.error("[auth/session] No project found for user:", {
+          userId: user.id,
+        });
+        throw new Error(
+          "No project found for authenticated user. Sign-in may have partially failed."
+        );
+      }
+
       session.user.id = user.id;
-      session.user.projectId = project?.id ?? "";
+      session.user.projectId = project.id;
 
       return session;
     },

@@ -37,6 +37,7 @@ export async function GET() {
   const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
 
   let stuckJobs: Array<{ id: string; type: string; startedAt: string }> = [];
+  let stuckJobCheckFailed = false;
 
   try {
     const stuckIngestionJobs = await prisma.ingestionJob.findMany({
@@ -82,16 +83,23 @@ export async function GET() {
   } catch (error) {
     // Non-fatal: stuck job check failure should not break health endpoint
     console.error("[health] Stuck job check failed:", error);
+    stuckJobCheckFailed = true;
   }
 
+  const status = stuckJobCheckFailed ? "degraded" : stuckJobs.length > 0 ? "warning" : "ok";
+
   const response: Record<string, unknown> = {
-    status: "ok",
+    status,
     database: databaseStatus,
     timestamp,
   };
 
   if (stuckJobs.length > 0) {
-    response.stuckJobs = stuckJobs;
+    response.stuckJobCount = stuckJobs.length;
+  }
+
+  if (stuckJobCheckFailed) {
+    response.stuckJobCheck = "error";
   }
 
   return NextResponse.json(response);

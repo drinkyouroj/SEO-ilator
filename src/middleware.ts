@@ -1,14 +1,16 @@
+import { auth } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
 
 /**
  * Next.js middleware protecting:
- * - /dashboard/* -- redirect to /auth/sign-in if unauthenticated
- * - /api/* (except /api/auth/*, /api/cron/*, /api/health) -- return 401 if unauthenticated
+ * - /dashboard/* — redirect to /auth/sign-in if unauthenticated
+ * - /api/* (except /api/auth/*, /api/cron/*, /api/health) — return 401 if unauthenticated
+ *
+ * Uses Auth.js v5 `auth` wrapper which works with database sessions
+ * (not `getToken` from next-auth/jwt which only works with JWT strategy).
  */
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
 
   // Allow auth routes and cron routes through without checking session
   if (pathname.startsWith("/api/auth/") || pathname.startsWith("/api/cron/")) {
@@ -20,16 +22,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check for authenticated session
-  const token = await getToken({
-    req: request,
-    secret: process.env.AUTH_SECRET,
-  });
+  const isAuthenticated = !!req.auth;
 
   // Dashboard routes: redirect to sign-in
   if (pathname.startsWith("/dashboard")) {
-    if (!token) {
-      const signInUrl = new URL("/auth/sign-in", request.url);
+    if (!isAuthenticated) {
+      const signInUrl = new URL("/auth/sign-in", req.url);
       signInUrl.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(signInUrl);
     }
@@ -38,14 +36,14 @@ export async function middleware(request: NextRequest) {
 
   // API routes: return 401
   if (pathname.startsWith("/api/")) {
-    if (!token) {
+    if (!isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     return NextResponse.next();
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/dashboard/:path*", "/api/:path*"],

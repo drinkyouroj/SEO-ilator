@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * [AAP-F5] Global fetch wrapper for client-side API calls.
  *

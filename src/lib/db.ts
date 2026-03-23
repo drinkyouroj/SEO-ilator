@@ -50,12 +50,21 @@ export function scopedPrisma(projectId: string) {
       {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         async $allOperations({ args, query }: { args: any; query: (args: any) => Promise<any> }) {
-          if (args.where && typeof args.where === "object") {
+          // Ensure args exists
+          if (!args) args = {};
+
+          // For read/update/delete ops: create where if missing, always inject projectId
+          if (!args.where) args.where = {};
+          if (typeof args.where === "object") {
             args.where.projectId = projectId;
           }
+
+          // For single-record create: inject projectId into data
           if (args.data && typeof args.data === "object" && !Array.isArray(args.data)) {
             args.data.projectId = projectId;
           }
+
+          // For createMany: inject projectId into each record
           if (Array.isArray(args.data)) {
             for (const record of args.data) {
               if (typeof record === "object" && record !== null) {
@@ -63,6 +72,7 @@ export function scopedPrisma(projectId: string) {
               }
             }
           }
+
           return query(args);
         },
       },
