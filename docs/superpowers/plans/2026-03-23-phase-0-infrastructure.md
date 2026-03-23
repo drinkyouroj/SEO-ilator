@@ -963,7 +963,7 @@ export function verifyCronSecret(request: Request): boolean {
 }
 ```
 
-- [ ] **Step 3: Verify all 3 tests PASS (GREEN)**
+- [ ] **Step 3: Verify all 4 tests PASS (GREEN)**
 Run: `npx vitest --run tests/lib/auth/cron-guard.test.ts`
 Expected: Output shows 4 tests passing:
 ```
@@ -975,7 +975,7 @@ Expected: Output shows 4 tests passing:
      ✓ returns_false_when_cron_secret_env_is_unset
 
  Test Files  1 passed (1)
-      Tests  3 passed (3)
+      Tests  4 passed (4)
 ```
 
 - [ ] **Step 4: Verify TypeScript compiles**
