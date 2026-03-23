@@ -11,7 +11,8 @@ const RESEND_COOLDOWN_SECONDS = 60;
 
 function VerifyRequestPageContent() {
   const searchParams = useSearchParams();
-  const email = searchParams.get("email") ?? "your inbox";
+  const emailParam = searchParams.get("email");
+  const displayEmail = emailParam ?? "your inbox";
 
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendStatus, setResendStatus] = useState<
@@ -30,19 +31,29 @@ function VerifyRequestPageContent() {
   const handleResend = useCallback(async () => {
     if (resendCooldown > 0 || resendStatus === "sending") return;
 
+    // Cannot resend without a valid email address
+    if (!emailParam) {
+      setResendStatus("error");
+      return;
+    }
+
     setResendStatus("sending");
     try {
-      await signIn("email", {
-        email,
+      const result = await signIn("email", {
+        email: emailParam,
         redirect: false,
         callbackUrl: "/dashboard/articles",
       });
-      setResendStatus("sent");
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      if (result?.error) {
+        setResendStatus("error");
+      } else {
+        setResendStatus("sent");
+        setResendCooldown(RESEND_COOLDOWN_SECONDS);
+      }
     } catch {
       setResendStatus("error");
     }
-  }, [email, resendCooldown, resendStatus]);
+  }, [emailParam, resendCooldown, resendStatus]);
 
   return (
     <AuthLayout>
@@ -72,7 +83,7 @@ function VerifyRequestPageContent() {
         <p className="mb-6 text-sm text-gray-600 dark:text-gray-400">
           We sent a sign-in link to{" "}
           <span className="font-medium text-gray-900 dark:text-gray-100">
-            {email}
+            {displayEmail}
           </span>
           . The link expires in 10 minutes.
         </p>

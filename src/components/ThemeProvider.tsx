@@ -35,8 +35,15 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === "undefined") return defaultTheme;
-    const stored = localStorage.getItem(storageKey) as Theme | null;
-    return stored ?? defaultTheme;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored === "light" || stored === "dark" || stored === "system") {
+        return stored;
+      }
+    } catch {
+      // localStorage unavailable (incognito, disabled, etc.)
+    }
+    return defaultTheme;
   });
 
   // Track the system preference separately so changes are reactive
@@ -53,7 +60,11 @@ export function ThemeProvider({
   const setTheme = useCallback(
     (newTheme: Theme) => {
       setThemeState(newTheme);
-      localStorage.setItem(storageKey, newTheme);
+      try {
+        localStorage.setItem(storageKey, newTheme);
+      } catch {
+        // localStorage unavailable — theme still works for this session
+      }
     },
     [storageKey]
   );

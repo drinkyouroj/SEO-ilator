@@ -35,7 +35,11 @@ function OAuthButton({ provider, label, icon }: OAuthButtonProps) {
 
   const handleClick = async () => {
     setLoading(true);
-    await signIn(provider, { callbackUrl: "/dashboard/articles" });
+    try {
+      await signIn(provider, { callbackUrl: "/dashboard/articles" });
+    } catch {
+      setLoading(false);
+    }
   };
 
   return (
@@ -76,8 +80,10 @@ function MagicLinkForm() {
       if (result?.error) {
         setError(ERROR_MESSAGES.EmailSignin);
         setLoading(false);
+      } else {
+        // redirect: false means we must navigate manually
+        window.location.href = `/auth/verify-request?email=${encodeURIComponent(email)}`;
       }
-      // If successful, next-auth redirects to verify-request
     } catch {
       setError(ERROR_MESSAGES.EmailSignin);
       setLoading(false);
