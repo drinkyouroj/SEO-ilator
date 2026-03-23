@@ -84,7 +84,7 @@ Phase 2 builds the dashboard layout shell, auth UI pages, all placeholder dashbo
 - `npm run build` succeeds
 - Manual test: `/auth/sign-in` renders with Google, GitHub, and magic link options
 - Manual test: error codes render correct messages
-- Manual test: all 7 dashboard routes render placeholder pages
+- Manual test: all 7 dashboard routes render (1 redirect + 6 placeholder pages)
 - Manual test: `/dashboard` redirects to `/dashboard/articles`
 
 ### TDD Agent
@@ -212,7 +212,7 @@ After all three branches merge into `feature/phase-2`, run these checks:
 | Dark mode class strategy | `src/components/ThemeProvider.tsx` |
 | SessionProvider in root layout | `src/app/layout.tsx` |
 | ThemeProvider in root layout | `src/app/layout.tsx` |
-| All 7 placeholder pages exist | `src/app/dashboard/*/page.tsx` |
+| All 7 dashboard routes (1 redirect + 6 placeholder pages) exist | `src/app/dashboard/*/page.tsx` |
 | EmptyState with CTA on all placeholders | `src/app/dashboard/*/page.tsx` |
 
 ---

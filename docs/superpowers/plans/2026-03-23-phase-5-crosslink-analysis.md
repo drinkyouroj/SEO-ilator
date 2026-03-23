@@ -146,6 +146,8 @@ export interface AnalysisContext {
   loadArticleBodies: (ids: string[]) => Promise<Map<string, string>>;
 }
 
+> **Note:** This interface narrows `article` from the full Prisma `Article` type and uses `ArticleSummary[]` instead of `Article[]` per [AAP-B7]. CLAUDE.md's `SEOStrategy` interface should be updated to reflect these AAP modifications during Phase 5 implementation.
+
 // ─── Recommendation ──────────────────────────────────────────────────────────
 
 export interface RecommendationSuggestion {
@@ -319,16 +321,19 @@ export class StrategyRegistry {
    * @returns Combined array of recommendations from all strategies
    */
   async analyzeWithAll(
-    context: Omit<AnalysisContext, "settings">
+    context: Omit<AnalysisContext, "settings"> & {
+      /** Per-strategy settings keyed by strategy.id */
+      strategySettings?: Record<string, Record<string, unknown>>;
+    }
   ): Promise<Recommendation[]> {
     const allRecommendations: Recommendation[] = [];
 
     for (const strategy of this.strategies.values()) {
       const strategySettings =
-        (context as Record<string, unknown>)[strategy.id] ?? {};
+        context.strategySettings?.[strategy.id] ?? {};
       const recs = await strategy.analyze({
         ...context,
-        settings: strategySettings as Record<string, unknown>,
+        settings: strategySettings,
       });
       allRecommendations.push(...recs);
     }
@@ -465,13 +470,13 @@ mkdir -p tests/lib/strategies
 
 ```typescript
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { CrosslinkStrategy } from "../../../src/lib/strategies/crosslink";
+import { CrosslinkStrategy } from "@/lib/strategies/crosslink";
 import type {
   AnalysisContext,
   ArticleSummary,
   Recommendation,
   ExistingLink,
-} from "../../../src/lib/strategies/types";
+} from "@/lib/strategies/types";
 
 // ─── Test Helpers ────────────────────────────────────────────────────────────
 
@@ -1846,12 +1851,12 @@ Uncomments the crosslink import now that crosslink.ts exists."
 
 ```typescript
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { StrategyRegistry } from "../../../src/lib/strategies/registry";
+import { StrategyRegistry } from "@/lib/strategies/registry";
 import type {
   SEOStrategy,
   AnalysisContext,
   Recommendation,
-} from "../../../src/lib/strategies/types";
+} from "@/lib/strategies/types";
 
 // ─── Mock Strategy ───────────────────────────────────────────────────────────
 
@@ -2000,8 +2005,8 @@ mkdir -p tests/lib/analysis
 
 ```typescript
 import { describe, it, expect } from "vitest";
-import { deduplicateAndRank } from "../../../src/lib/analysis/dedup-ranker";
-import type { Recommendation } from "../../../src/lib/strategies/types";
+import { deduplicateAndRank } from "@/lib/analysis/dedup-ranker";
+import type { Recommendation } from "@/lib/strategies/types";
 
 // ─── Test Helpers ────────────────────────────────────────────────────────────
 
@@ -2308,12 +2313,12 @@ Applies maxLinksPerPage cap per source article. All 4 tests pass."
 
 ```typescript
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { computeReAnalysisScope } from "../../../src/lib/analysis/re-analysis";
+import { computeReAnalysisScope } from "@/lib/analysis/re-analysis";
 
 // ─── Mock Prisma ─────────────────────────────────────────────────────────────
 
 // We mock the db module to control what Prisma returns
-vi.mock("../../../src/lib/db", () => {
+vi.mock("@/lib/db", () => {
   return {
     prisma: {
       article: {
@@ -2329,7 +2334,7 @@ vi.mock("../../../src/lib/db", () => {
   };
 });
 
-import { prisma } from "../../../src/lib/db";
+import { prisma } from "@/lib/db";
 
 const mockArticleFindMany = prisma.article.findMany as ReturnType<typeof vi.fn>;
 const mockRecommendationFindMany = prisma.recommendation.findMany as ReturnType<typeof vi.fn>;
@@ -2793,11 +2798,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   createAnalysisRun,
   processAnalysisRun,
-} from "../../../src/lib/analysis/orchestrator";
+} from "@/lib/analysis/orchestrator";
 
 // ─── Mock Dependencies ───────────────────────────────────────────────────────
 
-vi.mock("../../../src/lib/db", () => {
+vi.mock("@/lib/db", () => {
   const mockTx = {
     recommendation: {
       createMany: vi.fn(async () => ({ count: 0 })),
@@ -2832,7 +2837,7 @@ vi.mock("../../../src/lib/db", () => {
   };
 });
 
-vi.mock("../../../src/lib/strategies/registry", () => {
+vi.mock("@/lib/strategies/registry", () => {
   return {
     registry: {
       getAllStrategies: vi.fn(() => []),
@@ -2841,7 +2846,7 @@ vi.mock("../../../src/lib/strategies/registry", () => {
   };
 });
 
-vi.mock("../../../src/lib/analysis/re-analysis", () => {
+vi.mock("@/lib/analysis/re-analysis", () => {
   return {
     computeReAnalysisScope: vi.fn(async () => ({
       newArticles: [],
@@ -2853,15 +2858,15 @@ vi.mock("../../../src/lib/analysis/re-analysis", () => {
   };
 });
 
-vi.mock("../../../src/lib/analysis/dedup-ranker", () => {
+vi.mock("@/lib/analysis/dedup-ranker", () => {
   return {
     deduplicateAndRank: vi.fn((...args: unknown[]) => args[0]),
   };
 });
 
-import { prisma } from "../../../src/lib/db";
-import { registry } from "../../../src/lib/strategies/registry";
-import { computeReAnalysisScope } from "../../../src/lib/analysis/re-analysis";
+import { prisma } from "@/lib/db";
+import { registry } from "@/lib/strategies/registry";
+import { computeReAnalysisScope } from "@/lib/analysis/re-analysis";
 
 const mockAnalysisRunCreate = prisma.analysisRun.create as ReturnType<typeof vi.fn>;
 const mockAnalysisRunUpdate = prisma.analysisRun.update as ReturnType<typeof vi.fn>;

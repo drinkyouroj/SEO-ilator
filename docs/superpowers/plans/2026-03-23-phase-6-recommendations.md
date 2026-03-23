@@ -524,6 +524,12 @@ when stale. Includes tenant isolation via projectId."
 
 **Expected:** Clean commit on `feature/phase-6-api`.
 
+### Step 6.1b.4 — Verify optimistic locking with a test case
+
+> The following test case should be included in integration or API-level tests for the PATCH [id] route:
+
+- `it("returns_409_when_updatedAt_is_stale")` — Send a PATCH request with a valid recommendation ID but an `updatedAt` value that is older than the current database value. Verify the response status is `409` and the body contains `currentUpdatedAt` with the actual database timestamp.
+
 ---
 
 ## API Agent: Task 6.1c — PATCH /api/recommendations/bulk
@@ -964,9 +970,9 @@ Column order per DECISION-003. Passes all 4 CSV tests."
 > **Branch:** `feature/phase-6-export` (continues from 6.2a)
 > **Depends on:** None (pure function)
 
-### Step 6.2b.1 — RED: Write 4 failing sanitize tests
+### Step 6.2b.1 — RED: Write 6 failing sanitize tests
 
-- [ ] Create `tests/lib/export/sanitize.test.ts` with all 4 test cases
+- [ ] Create `tests/lib/export/sanitize.test.ts` with all 6 test cases
 
 **File:** `tests/lib/export/sanitize.test.ts`
 
@@ -1002,6 +1008,16 @@ describe("sanitizeCell", () => {
     expect(sanitizeCell("+cmd|' /C calc'!A0")).toBe("'+cmd|' /C calc'!A0");
   });
 
+  it("prefixes_minus_sign_with_quote", () => {
+    expect(sanitizeCell("-1+2")).toBe("'-1+2");
+    expect(sanitizeCell("-cmd|' /C calc'!A0")).toBe("'-cmd|' /C calc'!A0");
+  });
+
+  it("prefixes_at_sign_with_quote", () => {
+    expect(sanitizeCell("@SUM(A1:A10)")).toBe("'@SUM(A1:A10)");
+    expect(sanitizeCell("@import('https://evil.com')")).toBe("'@import('https://evil.com')");
+  });
+
   it("passes_through_normal_text", () => {
     expect(sanitizeCell("How to Build SEO Tools")).toBe("How to Build SEO Tools");
     expect(sanitizeCell("https://example.com/article")).toBe("https://example.com/article");
@@ -1019,7 +1035,7 @@ describe("sanitizeCell", () => {
 
 ```bash
 npx vitest tests/lib/export/sanitize.test.ts --run 2>&1 | tail -10
-# Expected: 4 failing tests (import error — sanitizeCell doesn't exist yet)
+# Expected: 6 failing tests (import error — sanitizeCell doesn't exist yet)
 ```
 
 ### Step 6.2b.2 — Commit failing sanitize tests
@@ -1028,11 +1044,11 @@ npx vitest tests/lib/export/sanitize.test.ts --run 2>&1 | tail -10
 
 ```bash
 git add tests/lib/export/sanitize.test.ts
-git commit -m "test(export): RED — add 4 failing sanitizeCell tests
+git commit -m "test(export): RED — add 6 failing sanitizeCell tests
 
-Tests for =, +, -, @ prefix prevention, normal text passthrough, and empty
-string handling. sanitizeCell implementation does not exist yet.
-TDD red phase per DECISION-003 formula injection prevention."
+Tests for =, +, -, @ prefix prevention (individual test cases for each),
+normal text passthrough, and empty string handling. sanitizeCell implementation
+does not exist yet. TDD red phase per DECISION-003 formula injection prevention."
 ```
 
 **Expected:** Clean commit with failing tests.
@@ -1084,7 +1100,7 @@ export function sanitizeCell(value: string): string {
 
 ```bash
 npx vitest tests/lib/export/sanitize.test.ts --run 2>&1 | tail -10
-# Expected: 4 passing tests
+# Expected: 6 passing tests
 ```
 
 ### Step 6.2b.4 — Commit the sanitize implementation
@@ -1097,10 +1113,10 @@ git commit -m "feat(export): GREEN — add sanitizeCell for formula injection pr
 
 Prefixes cells starting with =, +, -, @ with a single quote to prevent
 spreadsheet formula injection. Passes through normal text and empty strings
-unchanged. Per DECISION-003. Passes all 4 sanitize tests."
+unchanged. Per DECISION-003. Passes all 6 sanitize tests."
 ```
 
-**Expected:** Clean commit. All 4 sanitize tests pass.
+**Expected:** Clean commit. All 6 sanitize tests pass.
 
 ---
 
@@ -3542,7 +3558,7 @@ git merge feature/phase-6-ui --no-ff -m "merge: UI Agent (6.4-6.8) into phase-6"
 |-------|---------|----------|
 | Types pass | `npx tsc --noEmit` | Exit 0 |
 | CSV tests pass | `npx vitest tests/lib/export/csv.test.ts --run` | 4/4 passing |
-| Sanitize tests pass | `npx vitest tests/lib/export/sanitize.test.ts --run` | 4/4 passing |
+| Sanitize tests pass | `npx vitest tests/lib/export/sanitize.test.ts --run` | 6/6 passing |
 | CopySnippet tests pass | `npx vitest tests/components/recommendations/CopySnippet.test.tsx --run` | 6/6 passing |
 | RecommendationCard tests pass | `npx vitest tests/components/data/RecommendationCard.test.tsx --run` | 3/3 passing |
 | All tests pass | `npx vitest --run` | All passing (including prior phases) |
@@ -3605,12 +3621,12 @@ gh pr create \
 
 ## Test Plan
 - [ ] npx vitest tests/lib/export/csv.test.ts (4 tests)
-- [ ] npx vitest tests/lib/export/sanitize.test.ts (4 tests)
+- [ ] npx vitest tests/lib/export/sanitize.test.ts (6 tests)
 - [ ] npx vitest tests/components/recommendations/CopySnippet.test.tsx (6 tests)
 - [ ] npx vitest tests/components/data/RecommendationCard.test.tsx (3 tests)
 - [ ] npx tsc --noEmit
 - [ ] npm run build
-- [ ] 17 total test cases passing"
+- [ ] 19 total test cases passing"
 ```
 
 ---
@@ -3620,10 +3636,10 @@ gh pr create \
 | Test File | Tests | Agent | TDD |
 |-----------|-------|-------|-----|
 | `tests/lib/export/csv.test.ts` | 4 | Export TDD | Yes (red/green) |
-| `tests/lib/export/sanitize.test.ts` | 4 | Export TDD | Yes (red/green) |
+| `tests/lib/export/sanitize.test.ts` | 6 | Export TDD | Yes (red/green) |
 | `tests/components/recommendations/CopySnippet.test.tsx` | 6 | UI | Yes (red/green) |
 | `tests/components/data/RecommendationCard.test.tsx` | 3 | UI | Yes (red/green) |
-| **Total** | **17** | | |
+| **Total** | **19** | | |
 
 ## Files Created
 

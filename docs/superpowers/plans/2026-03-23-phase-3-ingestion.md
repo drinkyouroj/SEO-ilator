@@ -407,22 +407,82 @@ npx tsc --noEmit 2>&1 | head -5
 # Expected: no errors (exit 0)
 ```
 
-### Step 3.2.3 — Commit the SSRF validator
+### Step 3.2.3 — RED: Write failing SSRF URL validator tests (6 test cases)
 
-- [ ] Commit the URL validator
+- [ ] Create `tests/lib/ingestion/url-validator.test.ts` with 6 failing tests
+
+**File:** `tests/lib/ingestion/url-validator.test.ts`
+
+```typescript
+import { describe, it, expect } from "vitest";
+import { validatePublicUrl, validateResolvedIp } from "@/lib/ingestion/url-validator";
+
+describe("validatePublicUrl", () => {
+  it("rejects_private_ipv4_addresses", () => {
+    // 10.x.x.x, 172.16.x.x, 192.168.x.x, 127.x.x.x ranges
+    expect(validatePublicUrl("http://10.0.0.1/page")).toBe(false);
+    expect(validatePublicUrl("http://172.16.0.1/page")).toBe(false);
+    expect(validatePublicUrl("http://192.168.1.1/page")).toBe(false);
+    expect(validatePublicUrl("http://127.0.0.1/page")).toBe(false);
+  });
+
+  it("rejects_localhost_and_metadata_endpoints", () => {
+    expect(validatePublicUrl("http://localhost/page")).toBe(false);
+    expect(validatePublicUrl("http://169.254.169.254/latest/meta-data/")).toBe(false);
+    expect(validatePublicUrl("http://metadata.google.internal/")).toBe(false);
+  });
+
+  it("rejects_non_http_schemes", () => {
+    expect(validatePublicUrl("file:///etc/passwd")).toBe(false);
+    expect(validatePublicUrl("ftp://example.com/file")).toBe(false);
+    expect(validatePublicUrl("javascript:alert(1)")).toBe(false);
+  });
+
+  it("rejects_urls_with_credentials", () => {
+    expect(validatePublicUrl("http://user:pass@example.com/page")).toBe(false);
+  });
+
+  it("accepts_valid_public_urls", () => {
+    expect(validatePublicUrl("https://example.com/article")).toBe(true);
+    expect(validatePublicUrl("https://blog.example.com/post/123")).toBe(true);
+    expect(validatePublicUrl("http://example.com/page")).toBe(true);
+  });
+});
+
+describe("validateResolvedIp", () => {
+  it("validates_resolved_ip_at_fetch_time", () => {
+    // Private IPs must be rejected even at fetch time (DNS rebinding prevention)
+    expect(validateResolvedIp("10.0.0.1")).toBe(false);
+    expect(validateResolvedIp("172.16.0.1")).toBe(false);
+    expect(validateResolvedIp("192.168.1.1")).toBe(false);
+    expect(validateResolvedIp("127.0.0.1")).toBe(false);
+    expect(validateResolvedIp("169.254.169.254")).toBe(false);
+    // Public IPs should be accepted
+    expect(validateResolvedIp("93.184.216.34")).toBe(true);
+  });
+});
+```
+
+> **RED-GREEN:** These tests will fail initially because `url-validator.ts` does not exist yet. They will pass once the url-validator implementation in Step 3.2.2 is complete. Run them with `npx vitest run tests/lib/ingestion/url-validator.test.ts` to confirm RED, then verify GREEN after Step 3.2.2.
+
+### Step 3.2.4 — Commit the SSRF validator and tests
+
+- [ ] Commit the URL validator and tests
 
 ```bash
-git add src/lib/ingestion/url-validator.ts
+git add src/lib/ingestion/url-validator.ts tests/lib/ingestion/url-validator.test.ts
 git commit -m "feat(ingestion): add SSRF URL validator with dual-point validation
 
 Implements validatePublicUrl() for submission-time hostname checks and
 validateResolvedIp() for fetch-time DNS rebinding prevention [AAP-B1].
-Rejects private IPs, localhost, cloud metadata, non-HTTP schemes."
+Rejects private IPs, localhost, cloud metadata, non-HTTP schemes.
+Includes 6 test cases covering private IPs, localhost/metadata, non-HTTP
+schemes, credential URLs, valid URLs, and fetch-time IP validation."
 ```
 
 **Expected:** Clean commit on `feature/phase-3-validation`.
 
-### Step 3.2.4 — Push the validation branch
+### Step 3.2.5 — Push the validation branch
 
 - [ ] Push `feature/phase-3-validation` so parallel agents can branch from it
 
@@ -5290,6 +5350,8 @@ git worktree remove ../SEO-ilator-ui 2>/dev/null || true
 | AAP-O1 | CSR detection | `crawler.ts` | parseWarning for <50 words from 200 OK |
 | AAP-O7 | HTML push existingLinks | `articles/route.ts` | parsePage() for bodyFormat "html" |
 | AAP-O10 | Sitemap safety limits | `sitemap-parser.ts` | Depth 2, 50MB, 10K URLs |
+
+> **Directory extensions:** This phase introduces `src/lib/validation/` and extends `src/lib/ingestion/`, per the architecture documented in CLAUDE.md.
 
 ### Step I.6 — Create PR to develop
 

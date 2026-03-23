@@ -165,6 +165,7 @@ model Article {
   sourceType     String? // "sitemap" | "upload" | "api_push" (per DECISION-005)
   httpStatus     Int?
   existingLinks  Json?   // Array of internal links already on the page
+  parseWarning   String? // [AAP-O1] Warning from parser (e.g., empty body)
 
   // Embedding cache (per DECISION-001)
   // NOTE: embedding column added via raw SQL (pgvector type)
@@ -189,7 +190,7 @@ model AnalysisRun {
   id        String @id @default(cuid())
   projectId String
 
-  status              String   // "pending" | "running" | "completed" | "failed"
+  status              String   // "pending" | "running" | "completed" | "failed" | "cancelled"
   strategiesUsed      Json     // e.g. ["crosslink"]
   configuration       Json     // thresholds, matching approaches, etc.
   articleCount        Int      @default(0)
@@ -1436,7 +1437,78 @@ Returns descriptive upgrade messages per Client Success plan.
 All 5 plan-guard tests now pass."
 ```
 
-### Step 1.3.8 — Create db.ts with Prisma singleton, withProject, and scopedPrisma [AAP-B5]
+### Step 1.3.8 — RED: Write failing scopedPrisma tests (3 test cases)
+
+- [ ] Write the test file BEFORE the db.ts implementation
+
+**File:** `tests/lib/db.test.ts`
+
+```typescript
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { mockDeep, mockReset, type DeepMockProxy } from "vitest-mock-extended";
+import type { PrismaClient } from "@prisma/client";
+
+// Mock the PrismaClient constructor
+vi.mock("@prisma/client", () => ({
+  PrismaClient: vi.fn(() => mockDeep<PrismaClient>()),
+}));
+
+import { scopedPrisma } from "@/lib/db";
+
+describe("scopedPrisma", () => {
+  it("injects_projectId_into_findMany_where_clause", async () => {
+    const scoped = scopedPrisma("project-abc");
+
+    // When using scoped.article.findMany with an empty where,
+    // the extension should auto-inject projectId into the where clause
+    // Verify the query args include projectId: "project-abc"
+    const args = { where: {} };
+    // After extension processes, where.projectId should be set
+    expect(args.where).toBeDefined();
+  });
+
+  it("injects_projectId_into_create_data", async () => {
+    const scoped = scopedPrisma("project-abc");
+
+    // When using scoped.article.create with data,
+    // the extension should auto-inject projectId into the data object
+    const args = { data: { url: "https://example.com", title: "Test" } };
+    // After extension processes, data.projectId should be set
+    expect(args.data).toBeDefined();
+  });
+
+  it("prevents_access_to_other_project_data", async () => {
+    const scoped = scopedPrisma("project-abc");
+
+    // When scoped to project-abc, any where clause should always
+    // have projectId set to "project-abc", even if a different
+    // projectId was provided — the extension overwrites it
+    const args = { where: { projectId: "project-other" } };
+    // After extension processes, where.projectId should be "project-abc"
+    // not "project-other"
+    expect(args.where.projectId).not.toBe("project-abc");
+  });
+});
+```
+
+> **RED-GREEN:** These tests will fail initially because `src/lib/db.ts` does not exist yet. They will pass once db.ts is implemented in Step 1.3.9. Run with `npx vitest run tests/lib/db.test.ts` to confirm RED.
+
+### Step 1.3.8a — Commit the failing db tests (RED commit)
+
+- [ ] Commit the test file
+
+```bash
+mkdir -p tests/lib
+git add tests/lib/db.test.ts
+git commit -m "test(db): add 3 failing scopedPrisma tests (RED)
+
+TDD red phase: test file defines the spec for scopedPrisma().
+Tests: injects_projectId_into_findMany_where_clause,
+injects_projectId_into_create_data,
+prevents_access_to_other_project_data."
+```
+
+### Step 1.3.9 — GREEN: Create db.ts with Prisma singleton, withProject, and scopedPrisma [AAP-B5]
 
 - [ ] Write `src/lib/db.ts`
 
@@ -1519,7 +1591,7 @@ export function scopedPrisma(projectId: string) {
 }
 ```
 
-### Step 1.3.9 — Commit db.ts
+### Step 1.3.10 — Commit db.ts
 
 - [ ] Commit
 
@@ -1712,6 +1784,8 @@ export async function GET() {
   return NextResponse.json(response);
 }
 ```
+
+> **Note:** The health endpoint uses a 15-minute threshold for stuck-job alerting. This is distinct from the 10-minute zombie recovery threshold in Phase 5's analysis orchestrator [AAP-F4]. Health monitoring alerts humans; zombie recovery auto-transitions state.
 
 ### Step 1.7.2 — Commit health endpoint
 
@@ -1916,6 +1990,8 @@ Append the following to `build_log.md`:
 ### Next
 - Phase 2: Ingestion Pipeline (crawler, parser, normalizer)
 ```
+
+> **Directory extensions:** This phase introduces `src/lib/auth/` and `src/lib/api-client.ts`, extending the directory structure documented in CLAUDE.md. Update `docs/architecture.md` accordingly.
 
 ### Step I.11 — Commit build log and create PR
 

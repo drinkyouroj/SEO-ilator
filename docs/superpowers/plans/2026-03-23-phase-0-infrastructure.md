@@ -145,39 +145,37 @@ git commit -m "chore(env): add .env.example with all 16 required environment var
 
 ---
 
-### Task 4: Configure next.config.js (0.7 + 0.15)
+### Task 4: Configure next.config.ts (0.7 + 0.15)
 
 **Agent:** Config Agent
 **Files:**
-- Modify: `next.config.js` (or `next.config.ts` — overwrite whichever create-next-app generated)
+- Modify: `next.config.ts` (the ESM config file that create-next-app generates)
 
 - [ ] **Step 1: Replace next.config with bundle analyzer and external packages**
-Overwrite the existing next config file (check whether create-next-app generated `next.config.js`, `next.config.mjs`, or `next.config.ts` and replace it) with:
-```javascript
-// @ts-check
-const withBundleAnalyzer = require("@next/bundle-analyzer")({
+Overwrite the existing `next.config.ts` (which create-next-app generates by default) with:
+```typescript
+import type { NextConfig } from "next";
+import withBundleAnalyzer from "@next/bundle-analyzer";
+
+const nextConfig: NextConfig = {
+  serverExternalPackages: ["@prisma/client", "cheerio"],
+};
+
+const analyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["@prisma/client", "cheerio"],
-  },
-};
-
-module.exports = withBundleAnalyzer(nextConfig);
+export default analyzer(nextConfig);
 ```
-If create-next-app generated `next.config.ts` or `next.config.mjs`, delete it and create `next.config.js` instead. The `require()` syntax is necessary for `@next/bundle-analyzer`.
 
 - [ ] **Step 2: Verify config loads without error**
-Run: `node -e "require('./next.config.js')"`
-Expected: Exit code 0, no output (no errors)
+Run: `npx next info`
+Expected: Exit code 0, shows Next.js version and config info without errors.
 
 - [ ] **Step 3: Commit**
 ```bash
-git add next.config.*
-git commit -m "chore(config): configure next.config.js with bundle analyzer and external packages"
+git add next.config.ts
+git commit -m "chore(config): configure next.config.ts with bundle analyzer and external packages"
 ```
 
 ---
@@ -389,7 +387,7 @@ Expected: 8 commits visible on `feature/phase-0-config`:
 1. `chore(init): scaffold Next.js project...`
 2. `chore(deps): install all Phase 0...`
 3. `chore(env): add .env.example...`
-4. `chore(config): configure next.config.js...`
+4. `chore(config): configure next.config.ts...`
 5. `chore(ui): configure Tailwind...`
 6. `chore(test): configure Vitest...`
 7. `chore(scripts): add vercel-build...`
@@ -434,7 +432,6 @@ CREATE EXTENSION IF NOT EXISTS vector;
 - [ ] **Step 4: Create docker-compose.yml**
 Create `docker-compose.yml` with:
 ```yaml
-version: "3.8"
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -892,12 +889,26 @@ describe("verifyCronSecret", () => {
 
     expect(result).toBe(true);
   });
+
+  it("returns_false_when_cron_secret_env_is_unset", () => {
+    vi.unstubAllEnvs(); // Remove the CRON_SECRET stub set in beforeEach
+
+    const request = new Request("https://example.com/api/cron/crawl", {
+      headers: {
+        authorization: "Bearer any-value",
+      },
+    });
+
+    const result = verifyCronSecret(request);
+
+    expect(result).toBe(false);
+  });
 });
 ```
 
 - [ ] **Step 4: Verify tests FAIL (RED)**
 Run: `npx vitest --run tests/lib/auth/cron-guard.test.ts 2>&1`
-Expected: 3 tests fail. Output contains errors like `Cannot find module '@/lib/auth/cron-guard'` or similar import failure because the implementation file does not exist yet. This confirms the RED state.
+Expected: 4 tests fail. Output contains errors like `Cannot find module '@/lib/auth/cron-guard'` or similar import failure because the implementation file does not exist yet. This confirms the RED state.
 
 - [ ] **Step 5: Commit RED tests**
 ```bash
@@ -954,13 +965,14 @@ export function verifyCronSecret(request: Request): boolean {
 
 - [ ] **Step 3: Verify all 3 tests PASS (GREEN)**
 Run: `npx vitest --run tests/lib/auth/cron-guard.test.ts`
-Expected: Output shows 3 tests passing:
+Expected: Output shows 4 tests passing:
 ```
- ✓ tests/lib/auth/cron-guard.test.ts (3)
+ ✓ tests/lib/auth/cron-guard.test.ts (4)
    ✓ verifyCronSecret
      ✓ returns_false_without_authorization_header
      ✓ returns_false_with_wrong_secret
      ✓ returns_true_with_correct_secret
+     ✓ returns_false_when_cron_secret_env_is_unset
 
  Test Files  1 passed (1)
       Tests  3 passed (3)
@@ -984,7 +996,7 @@ git commit -m "feat(auth): implement cron secret verification with timing-safe c
 
 - [ ] **Step 1: Run full test suite**
 Run: `npx vitest --run`
-Expected: 3/3 tests pass, 0 failures.
+Expected: 4/4 tests pass, 0 failures.
 
 - [ ] **Step 2: Verify commit log**
 ```bash
@@ -1056,7 +1068,7 @@ Expected: Exit code 0
 ```bash
 npx vitest --run
 ```
-Expected: 3/3 tests pass (cron-guard)
+Expected: 4/4 tests pass (cron-guard)
 
 - [ ] **Step 5: Build**
 ```bash
@@ -1097,7 +1109,7 @@ grep -c "Preview" README.md
 # Expected: >= 2
 
 # Verify bundle analyzer
-grep -c "ANALYZE" next.config.js
+grep -c "ANALYZE" next.config.ts
 # Expected: 1
 
 # Verify timing-safe comparison
@@ -1120,7 +1132,7 @@ Expected: Config Agent commits at base, with two merge commits bringing in DevOp
 | 1 | Initialize Next.js project (0.1) | Config | 1 |
 | 2 | Install dependencies (0.2) | Config | 1 |
 | 3 | Create .env.example (0.3) | Config | 1 |
-| 4 | Configure next.config.js (0.7 + 0.15) | Config | 1 |
+| 4 | Configure next.config.ts (0.7 + 0.15) | Config | 1 |
 | 5 | Configure Tailwind (0.8) | Config | 1 |
 | 6 | Configure Vitest (0.9) | Config | 1 |
 | 7 | Update package.json scripts (0.11) | Config | 1 |
