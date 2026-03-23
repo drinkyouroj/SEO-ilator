@@ -40,3 +40,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma
+prisma/generated/
+
+# bundle analyzer
+.next/analyze/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
