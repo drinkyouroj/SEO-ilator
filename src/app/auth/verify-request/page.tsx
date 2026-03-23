@@ -1,7 +1,7 @@
 // src/app/auth/verify-request/page.tsx
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
@@ -9,7 +9,7 @@ import Link from "next/link";
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
-export default function VerifyRequestPage() {
+function VerifyRequestPageContent() {
   const searchParams = useSearchParams();
   const email = searchParams.get("email") ?? "your inbox";
 
@@ -127,5 +127,13 @@ export default function VerifyRequestPage() {
         </div>
       </div>
     </AuthLayout>
+  );
+}
+
+export default function VerifyRequestPage() {
+  return (
+    <Suspense>
+      <VerifyRequestPageContent />
+    </Suspense>
   );
 }

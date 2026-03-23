@@ -1,7 +1,7 @@
 // src/app/auth/sign-in/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { AuthLayout } from "@/components/layout/AuthLayout";
@@ -138,7 +138,7 @@ function Divider() {
 }
 
 // --- Page ---
-export default function SignInPage() {
+function SignInPageContent() {
   const searchParams = useSearchParams();
   const errorCode = searchParams.get("error");
   const errorMessage = getErrorMessage(errorCode);
@@ -214,5 +214,13 @@ export default function SignInPage() {
       {/* Magic link form */}
       <MagicLinkForm />
     </AuthLayout>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense>
+      <SignInPageContent />
+    </Suspense>
   );
 }
