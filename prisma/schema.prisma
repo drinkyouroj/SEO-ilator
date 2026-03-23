@@ -100,19 +100,16 @@ model Article {
   url       String
   title     String
   body      String  @db.Text
-  bodyHash  String  // SHA-256 of normalized body
-  titleHash String  // SHA-256 of normalized title
+  bodyHash  String
+  titleHash String
   wordCount Int
 
-  // Metadata captured during crawl (per DECISION-002)
-  metadata       Json?   // canonical URL, headings, meta title/desc, etc.
-  sourceType     String? // "sitemap" | "upload" | "api_push" (per DECISION-005)
+  metadata       Json?
+  sourceType     String?
   httpStatus     Int?
-  existingLinks  Json?   // Array of internal links already on the page
-  parseWarning   String? // [AAP-O1] Warning from parser (e.g., empty body)
+  existingLinks  Json?
+  parseWarning   String?
 
-  // Embedding cache (per DECISION-001)
-  // NOTE: embedding column added via raw SQL (pgvector type)
   embeddingModel String?
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
@@ -135,12 +132,11 @@ model AnalysisRun {
   projectId String
 
   status              String   // "pending" | "running" | "completed" | "failed" | "cancelled"
-  strategiesUsed      Json     // e.g. ["crosslink"]
-  configuration       Json     // thresholds, matching approaches, etc.
+  strategiesUsed      Json
+  configuration       Json
   articleCount        Int      @default(0)
   recommendationCount Int      @default(0)
 
-  // Embedding cost observability (per DECISION-001)
   embeddingsCached    Int      @default(0)
   embeddingsGenerated Int      @default(0)
 
@@ -167,24 +163,23 @@ model Recommendation {
   sourceArticleId String
   targetArticleId String
 
-  type        String  // "crosslink" | "meta" | "keyword" | "content_quality"
-  severity    String  // "info" | "warning" | "critical"
+  type        String
+  severity    String
   title       String
   description String  @db.Text
   anchorText  String?
   confidence  Float   @default(0)
 
-  matchingApproach String? // "keyword" | "semantic" | "both"
+  matchingApproach String?
 
-  status        String  @default("pending") // "pending" | "accepted" | "dismissed" | "superseded" [AAP-B4]
+  status        String  @default("pending") // "pending" | "accepted" | "dismissed" | "superseded"
   dismissReason String?
 
-  // One-click insertion prep (per DECISION-005)
   sourceContext   String? @db.Text
   charOffsetStart Int?
   charOffsetEnd   Int?
 
-  suggestion Json? // for non-crosslink strategies in future
+  suggestion Json?
 
   project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   analysisRun   AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
@@ -222,7 +217,7 @@ model IngestionJob {
   id        String @id @default(cuid())
   projectId String
 
-  status        String  // "pending" | "running" | "completed" | "failed" | "cancelled" [AAP-F9]
+  status        String  // "pending" | "running" | "completed" | "failed" | "cancelled"
   totalUrls     Int     @default(0)
   completedUrls Int     @default(0)
   failedUrls    Int     @default(0)
