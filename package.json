@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "vercel-build": "prisma generate && next build",
-    "migrate:deploy": "prisma migrate deploy",
+    "migrate:deploy": "prisma migrate deploy && tsx prisma/pgvector-setup.ts",
+    "migrate:dev": "prisma migrate dev && tsx prisma/pgvector-setup.ts",
     "test": "vitest",
     "test:coverage": "vitest --coverage"
   },
