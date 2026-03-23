@@ -1,10 +1,21 @@
 import { PrismaClient } from "@prisma/client";
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
+function getPrismaClient(): PrismaClient {
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = new PrismaClient();
+  }
+  return globalForPrisma.prisma;
+}
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// Lazy proxy: PrismaClient is only constructed on first property access,
+// not at module import time. This prevents build-time initialization errors.
+export const prisma = new Proxy({} as PrismaClient, {
+  get(_target, prop) {
+    return Reflect.get(getPrismaClient(), prop);
+  },
+});
 
 /**
  * Returns a where clause fragment scoped to the given project.
@@ -32,43 +43,31 @@ const TENANT_SCOPED_MODELS = [
 ] as const;
 
 export function scopedPrisma(projectId: string) {
-  return prisma.$extends({
-    query: {
-      ...Object.fromEntries(
-        TENANT_SCOPED_MODELS.map((model) => [
-          model,
-          {
-            async $allOperations({
-              args,
-              query,
-            }: {
-              args: Record<string, unknown>;
-              query: (args: Record<string, unknown>) => Promise<unknown>;
-            }) {
-              // For operations that have a `where` clause, inject projectId
-              if (args.where && typeof args.where === "object") {
-                (args.where as Record<string, unknown>).projectId = projectId;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const queryExtension: any = Object.fromEntries(
+    TENANT_SCOPED_MODELS.map((model) => [
+      model,
+      {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        async $allOperations({ args, query }: { args: any; query: (args: any) => Promise<any> }) {
+          if (args.where && typeof args.where === "object") {
+            args.where.projectId = projectId;
+          }
+          if (args.data && typeof args.data === "object" && !Array.isArray(args.data)) {
+            args.data.projectId = projectId;
+          }
+          if (Array.isArray(args.data)) {
+            for (const record of args.data) {
+              if (typeof record === "object" && record !== null) {
+                record.projectId = projectId;
               }
+            }
+          }
+          return query(args);
+        },
+      },
+    ])
+  );
 
-              // For create operations, inject projectId into data
-              if (args.data && typeof args.data === "object") {
-                (args.data as Record<string, unknown>).projectId = projectId;
-              }
-
-              // For createMany, inject projectId into each record
-              if (args.data && Array.isArray(args.data)) {
-                for (const record of args.data) {
-                  if (typeof record === "object" && record !== null) {
-                    (record as Record<string, unknown>).projectId = projectId;
-                  }
-                }
-              }
-
-              return query(args);
-            },
-          },
-        ])
-      ),
-    },
-  });
+  return prisma.$extends({ query: queryExtension });
 }

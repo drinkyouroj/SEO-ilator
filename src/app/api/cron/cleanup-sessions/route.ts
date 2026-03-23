@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyCronSecret } from "@/lib/auth/cron-guard";
 
+export const dynamic = "force-dynamic";
+
 /**
  * DELETE /api/cron/cleanup-sessions
  *
