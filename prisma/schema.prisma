@@ -7,3 +7,254 @@ datasource db {
   provider   = "postgresql"
   extensions = [vector]
 }
+
+// ── AUTH MODELS (Auth.js v5 Prisma Adapter) ──
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+
+  plan         String   @default("free") // "free" | "pro" | "enterprise"
+  articleLimit Int      @default(50)
+  runLimit     Int      @default(3)
+
+  accounts Account[]
+  sessions Session[]
+  projects Project[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@index([expires])
+}
+
+// ── PROJECT (multi-tenancy foundation, per DECISION-004) ──
+
+model Project {
+  id     String @id @default(cuid())
+  userId String
+  name   String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  articles        Article[]
+  analysisRuns    AnalysisRun[]
+  recommendations Recommendation[]
+  strategyConfigs StrategyConfig[]
+  ingestionJobs   IngestionJob[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ── ARTICLE ──
+
+model Article {
+  id        String @id @default(cuid())
+  projectId String
+
+  url       String
+  title     String
+  body      String  @db.Text
+  bodyHash  String  // SHA-256 of normalized body
+  titleHash String  // SHA-256 of normalized title
+  wordCount Int
+
+  // Metadata captured during crawl (per DECISION-002)
+  metadata       Json?   // canonical URL, headings, meta title/desc, etc.
+  sourceType     String? // "sitemap" | "upload" | "api_push" (per DECISION-005)
+  httpStatus     Int?
+  existingLinks  Json?   // Array of internal links already on the page
+  parseWarning   String? // [AAP-O1] Warning from parser (e.g., empty body)
+
+  // Embedding cache (per DECISION-001)
+  // NOTE: embedding column added via raw SQL (pgvector type)
+  embeddingModel String?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  sourceRecommendations Recommendation[] @relation("SourceArticle")
+  targetRecommendations Recommendation[] @relation("TargetArticle")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, url])
+  @@index([projectId, updatedAt])
+  @@index([projectId, bodyHash])
+}
+
+// ── ANALYSIS RUN ──
+
+model AnalysisRun {
+  id        String @id @default(cuid())
+  projectId String
+
+  status              String   // "pending" | "running" | "completed" | "failed" | "cancelled"
+  strategiesUsed      Json     // e.g. ["crosslink"]
+  configuration       Json     // thresholds, matching approaches, etc.
+  articleCount        Int      @default(0)
+  recommendationCount Int      @default(0)
+
+  // Embedding cost observability (per DECISION-001)
+  embeddingsCached    Int      @default(0)
+  embeddingsGenerated Int      @default(0)
+
+  error       String? @db.Text
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  recommendations Recommendation[]
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId, status])
+  @@index([projectId, createdAt])
+}
+
+// ── RECOMMENDATION ──
+
+model Recommendation {
+  id              String @id @default(cuid())
+  projectId       String
+  analysisRunId   String
+  strategyId      String
+  sourceArticleId String
+  targetArticleId String
+
+  type        String  // "crosslink" | "meta" | "keyword" | "content_quality"
+  severity    String  // "info" | "warning" | "critical"
+  title       String
+  description String  @db.Text
+  anchorText  String?
+  confidence  Float   @default(0)
+
+  matchingApproach String? // "keyword" | "semantic" | "both"
+
+  status        String  @default("pending") // "pending" | "accepted" | "dismissed" | "superseded" [AAP-B4]
+  dismissReason String?
+
+  // One-click insertion prep (per DECISION-005)
+  sourceContext   String? @db.Text
+  charOffsetStart Int?
+  charOffsetEnd   Int?
+
+  suggestion Json? // for non-crosslink strategies in future
+
+  project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  analysisRun   AnalysisRun @relation(fields: [analysisRunId], references: [id], onDelete: Cascade)
+  sourceArticle Article     @relation("SourceArticle", fields: [sourceArticleId], references: [id], onDelete: Cascade)
+  targetArticle Article     @relation("TargetArticle", fields: [targetArticleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projectId, analysisRunId, status, severity])
+  @@index([sourceArticleId, status])
+  @@index([targetArticleId])
+  @@unique([analysisRunId, sourceArticleId, targetArticleId, strategyId])
+}
+
+// ── STRATEGY CONFIG ──
+
+model StrategyConfig {
+  id         String @id @default(cuid())
+  projectId  String
+  strategyId String
+
+  settings Json
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([projectId, strategyId])
+}
+
+// ── INGESTION JOB + TASK (per DECISION-002) ──
+
+model IngestionJob {
+  id        String @id @default(cuid())
+  projectId String
+
+  status        String  // "pending" | "running" | "completed" | "failed" | "cancelled" [AAP-F9]
+  totalUrls     Int     @default(0)
+  completedUrls Int     @default(0)
+  failedUrls    Int     @default(0)
+  preset        String  @default("gentle") // "gentle" | "standard" | "fast"
+
+  completedAt DateTime?
+
+  project Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks   IngestionTask[]
+
+  createdAt DateTime @default(now())
+
+  @@index([projectId, status])
+  @@index([status, createdAt])
+}
+
+model IngestionTask {
+  id    String @id @default(cuid())
+  jobId String
+
+  url          String
+  status       String  @default("pending") // "pending" | "processing" | "completed" | "failed"
+  errorMessage String?
+  httpStatus   Int?
+  responseTimeMs Int?
+  retryCount   Int     @default(0)
+
+  startedAt   DateTime?
+  processedAt DateTime?
+
+  job IngestionJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, status])
+  @@index([status, startedAt])
+}
