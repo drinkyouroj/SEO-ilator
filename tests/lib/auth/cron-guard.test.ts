@@ -42,4 +42,21 @@ describe("verifyCronSecret", () => {
     const result = verifyCronSecret(request);
     expect(result).toBe(false);
   });
+
+  it("returns_false_with_non_bearer_auth_scheme", () => {
+    const request = new Request("https://example.com/api/cron/crawl", {
+      headers: { authorization: "Basic dXNlcjpwYXNz" },
+    });
+    const result = verifyCronSecret(request);
+    expect(result).toBe(false);
+  });
+
+  it("returns_false_when_cron_secret_env_is_empty_string", () => {
+    vi.stubEnv("CRON_SECRET", "");
+    const request = new Request("https://example.com/api/cron/crawl", {
+      headers: { authorization: "Bearer any-value" },
+    });
+    const result = verifyCronSecret(request);
+    expect(result).toBe(false);
+  });
 });

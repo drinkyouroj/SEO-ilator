@@ -44,9 +44,8 @@ jobs:
 
       - run: npx prisma generate
 
+      # Unit tests only — no database service needed
       - run: npx vitest --coverage
-        env:
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/seoilator_test"
 
   build:
     name: Production Build
@@ -102,4 +101,3 @@ jobs:
       - run: npx prisma db seed
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/seoilator_test"
-        continue-on-error: true
