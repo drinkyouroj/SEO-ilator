@@ -244,6 +244,7 @@ model IngestionTask {
   httpStatus   Int?
   responseTimeMs Int?
   retryCount   Int     @default(0)
+  retryAfter   DateTime?
 
   startedAt   DateTime?
   processedAt DateTime?
@@ -252,4 +253,5 @@ model IngestionTask {
 
   @@index([jobId, status])
   @@index([status, startedAt])
+  @@index([status, retryAfter])
 }
