@@ -1,15 +1,18 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Track $extends calls manually
 const extendsCalls: unknown[] = [];
 
-// Mock PrismaClient with a class that tracks $extends calls
+// Mock PrismaClient and adapter dependencies
 vi.mock("@prisma/client", () => {
   return {
     PrismaClient: class MockPrismaClient {
+      constructor() {
+        // Accept any options (adapter, etc.)
+      }
       $extends(arg: unknown) {
         extendsCalls.push(arg);
-        return this; // Return self to allow chaining
+        return this;
       }
       $queryRaw() {
         return Promise.resolve([{ 1: 1 }]);
@@ -18,11 +21,29 @@ vi.mock("@prisma/client", () => {
   };
 });
 
+vi.mock("@prisma/adapter-pg", () => ({
+  PrismaPg: class MockPrismaPg {
+    constructor() {}
+  },
+}));
+
+vi.mock("pg", () => ({
+  Pool: class MockPool {
+    constructor() {}
+  },
+}));
+
+// Stub DATABASE_URL for tests
+vi.stubEnv("DATABASE_URL", "postgresql://test:test@localhost:5432/test");
+
 import { scopedPrisma, withProject } from "@/lib/db";
 
 describe("scopedPrisma", () => {
-  it("returns_an_extended_prisma_client", () => {
+  beforeEach(() => {
     extendsCalls.length = 0;
+  });
+
+  it("returns_an_extended_prisma_client", () => {
     const scoped = scopedPrisma("project-abc");
 
     expect(scoped).toBeDefined();
@@ -30,7 +51,6 @@ describe("scopedPrisma", () => {
   });
 
   it("passes_query_extension_config_to_extends", () => {
-    extendsCalls.length = 0;
     const scoped = scopedPrisma("project-xyz");
 
     const callArgs = extendsCalls[0] as Record<string, unknown>;
@@ -39,13 +59,11 @@ describe("scopedPrisma", () => {
   });
 
   it("includes_all_tenant_scoped_models_in_extension", () => {
-    extendsCalls.length = 0;
     const scoped = scopedPrisma("project-tenant-1");
 
     const callArgs = extendsCalls[0] as Record<string, unknown>;
     const queryConfig = callArgs.query as Record<string, unknown>;
 
-    // All tenant-scoped models should be present in the query extension
     const expectedModels = [
       "article",
       "analysisRun",
