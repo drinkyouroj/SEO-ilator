@@ -1,45 +1,69 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mockDeep, mockReset, type DeepMockProxy } from "vitest-mock-extended";
-import type { PrismaClient } from "@prisma/client";
+import { describe, it, expect, vi } from "vitest";
 
-// Mock the PrismaClient constructor
-vi.mock("@prisma/client", () => ({
-  PrismaClient: vi.fn(() => mockDeep<PrismaClient>()),
-}));
+// Track $extends calls manually
+const extendsCalls: unknown[] = [];
 
-import { scopedPrisma } from "@/lib/db";
+// Mock PrismaClient with a class that tracks $extends calls
+vi.mock("@prisma/client", () => {
+  return {
+    PrismaClient: class MockPrismaClient {
+      $extends(arg: unknown) {
+        extendsCalls.push(arg);
+        return this; // Return self to allow chaining
+      }
+      $queryRaw() {
+        return Promise.resolve([{ 1: 1 }]);
+      }
+    },
+  };
+});
+
+import { scopedPrisma, withProject } from "@/lib/db";
 
 describe("scopedPrisma", () => {
-  it("injects_projectId_into_findMany_where_clause", async () => {
+  it("returns_an_extended_prisma_client", () => {
+    extendsCalls.length = 0;
     const scoped = scopedPrisma("project-abc");
 
-    // When using scoped.article.findMany with an empty where,
-    // the extension should auto-inject projectId into the where clause
-    // Verify the query args include projectId: "project-abc"
-    const args = { where: {} };
-    // After extension processes, where.projectId should be set
-    expect(args.where).toBeDefined();
+    expect(scoped).toBeDefined();
+    expect(extendsCalls.length).toBe(1);
   });
 
-  it("injects_projectId_into_create_data", async () => {
-    const scoped = scopedPrisma("project-abc");
+  it("passes_query_extension_config_to_extends", () => {
+    extendsCalls.length = 0;
+    const scoped = scopedPrisma("project-xyz");
 
-    // When using scoped.article.create with data,
-    // the extension should auto-inject projectId into the data object
-    const args = { data: { url: "https://example.com", title: "Test" } };
-    // After extension processes, data.projectId should be set
-    expect(args.data).toBeDefined();
+    const callArgs = extendsCalls[0] as Record<string, unknown>;
+    expect(callArgs).toHaveProperty("query");
+    expect(typeof callArgs.query).toBe("object");
   });
 
-  it("prevents_access_to_other_project_data", async () => {
-    const scoped = scopedPrisma("project-abc");
+  it("includes_all_tenant_scoped_models_in_extension", () => {
+    extendsCalls.length = 0;
+    const scoped = scopedPrisma("project-tenant-1");
 
-    // When scoped to project-abc, any where clause should always
-    // have projectId set to "project-abc", even if a different
-    // projectId was provided — the extension overwrites it
-    const args = { where: { projectId: "project-other" } };
-    // After extension processes, where.projectId should be "project-abc"
-    // not "project-other"
-    expect(args.where.projectId).not.toBe("project-abc");
+    const callArgs = extendsCalls[0] as Record<string, unknown>;
+    const queryConfig = callArgs.query as Record<string, unknown>;
+
+    // All tenant-scoped models should be present in the query extension
+    const expectedModels = [
+      "article",
+      "analysisRun",
+      "recommendation",
+      "strategyConfig",
+      "ingestionJob",
+      "ingestionTask",
+    ];
+
+    for (const model of expectedModels) {
+      expect(queryConfig).toHaveProperty(model);
+    }
+  });
+});
+
+describe("withProject", () => {
+  it("returns_object_with_projectId", () => {
+    const result = withProject("project-123");
+    expect(result).toEqual({ projectId: "project-123" });
   });
 });
