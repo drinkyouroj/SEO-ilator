@@ -52,3 +52,5 @@ prisma/generated/
 .vscode/
 *.swp
 *.swo
+.env*.local
+.superpowers/
