@@ -57,12 +57,12 @@ export async function GET() {
     });
 
     stuckJobs = [
-      ...stuckIngestionJobs.map((job) => ({
+      ...stuckIngestionJobs.map((job: { id: string; createdAt: Date }) => ({
         id: job.id,
         type: "ingestion_job" as const,
         startedAt: job.createdAt.toISOString(),
       })),
-      ...stuckAnalysisRuns.map((run) => ({
+      ...stuckAnalysisRuns.map((run: { id: string; startedAt: Date | null }) => ({
         id: run.id,
         type: "analysis_run" as const,
         startedAt: run.startedAt?.toISOString() ?? "unknown",
