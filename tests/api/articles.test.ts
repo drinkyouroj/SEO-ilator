@@ -110,7 +110,7 @@ const NORMALIZED_ARTICLE = {
 describe("POST /api/articles/push", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireAuth.mockResolvedValue({ projectId: "proj-1" });
+    mockRequireAuth.mockResolvedValue({ projectId: "proj-1", userId: "user-1" });
     mockCheckPlanLimits.mockResolvedValue({ allowed: true });
     mockNormalize.mockReturnValue(NORMALIZED_ARTICLE);
   });
@@ -170,7 +170,7 @@ describe("POST /api/articles/push", () => {
 describe("GET /api/articles/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireAuth.mockResolvedValue({ projectId: "proj-1" });
+    mockRequireAuth.mockResolvedValue({ projectId: "proj-1", userId: "user-1" });
   });
 
   it("returns_article_by_id", async () => {
@@ -207,7 +207,7 @@ describe("GET /api/articles/[id]", () => {
 describe("DELETE /api/articles/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireAuth.mockResolvedValue({ projectId: "proj-1" });
+    mockRequireAuth.mockResolvedValue({ projectId: "proj-1", userId: "user-1" });
   });
 
   it("deletes_article_successfully", async () => {

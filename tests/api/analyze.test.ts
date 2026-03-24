@@ -90,7 +90,7 @@ function makeRequest(body: unknown = {}): Request {
 describe("POST /api/analyze", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireAuth.mockResolvedValue({ projectId: "proj-1" });
+    mockRequireAuth.mockResolvedValue({ projectId: "proj-1", userId: "user-1" });
     mockCheckPlanLimits.mockResolvedValue({ allowed: true });
   });
 

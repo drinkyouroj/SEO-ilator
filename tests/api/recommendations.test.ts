@@ -75,7 +75,7 @@ function makeRec(overrides: Record<string, unknown> = {}) {
 describe("GET /api/recommendations — filter coverage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireAuth.mockResolvedValue({ projectId: "proj-1" });
+    mockRequireAuth.mockResolvedValue({ projectId: "proj-1", userId: "user-1" });
   });
 
   it("filters_recommendations_by_severity", async () => {
