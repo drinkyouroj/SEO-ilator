@@ -283,6 +283,14 @@ export default function AnalyzePage() {
         setPageState("IDLE");
         return;
       }
+      if (res.status === 400) {
+        const data = await res.json().catch(() => ({}));
+        if ((data as { error?: string }).error === "NO_ARTICLES") {
+          setDryRunError("No articles found. Add articles before running an analysis.");
+          setPageState("IDLE");
+          return;
+        }
+      }
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
       setDryRunSummary({

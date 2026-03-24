@@ -26,8 +26,8 @@ export const RATE_LIMIT_CONFIGS: Record<string, RateLimitConfig> = {
     windowMs: 60_000,
   },
   "POST:/api/analyze": {
-    maxTokens: 5,
-    refillRate: 5 / 3600, // 5 per hour
+    maxTokens: 20,
+    refillRate: 20 / 3600, // 20 per hour
     windowMs: 3_600_000,
   },
   default: {
