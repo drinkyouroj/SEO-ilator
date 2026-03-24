@@ -13,6 +13,7 @@ import {
 } from "@/lib/ingestion/queue";
 import { RobotsCache } from "@/lib/ingestion/robots";
 import { PRESET_DELAYS, type CrawlPreset } from "@/lib/ingestion/types";
+import { invalidateEmbedding } from "@/lib/embeddings/batch";
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +149,7 @@ export async function GET(request: Request) {
               const normalized = normalizeArticle(parsed, projectId, "crawl");
 
               // Upsert Article
-              await prisma.article.upsert({
+              const upserted = await prisma.article.upsert({
                 where: {
                   projectId_url: {
                     projectId,
@@ -186,6 +187,12 @@ export async function GET(request: Request) {
                   httpStatus: crawlResult.httpStatus,
                 },
               });
+
+              try {
+                await invalidateEmbedding(upserted.id);
+              } catch (err) {
+                console.warn(`[cron/crawl] Article ${upserted.id} saved but embedding invalidation failed:`, err);
+              }
 
               await completeTask(
                 taskId,

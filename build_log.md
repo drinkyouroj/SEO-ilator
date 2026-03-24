@@ -107,3 +107,28 @@
 
 ### Next
 - Phase 4: Embedding Provider & Cache
+
+## 2026-03-23 — Phase 4: Embedding Provider & Cache
+
+### Done
+- EmbeddingProvider interface with modelId, dimensions, batchSize, embed()
+- OpenAI adapter: text-embedding-3-small, 1536 dims, batch 2048 (SDK-based)
+- Cohere adapter: embed-english-v3.0, 1024 dims, batch 96 (direct fetch, no SDK)
+- Provider factory: StrategyConfig table lookup → env var fallback → default OpenAI
+- PROVIDER_DIMENSIONS map + STORAGE_DIMENSIONS constant
+- Cache check: defensive bodyHash + titleHash + embeddingModel + embedding presence [DECISION-001]
+- Batch processor: cache split, empty-body filter, chunked embedding, zero-padding to 1536 [AAP-B6]
+- pgvector similarity: cosine distance with ef_search=100, threshold in SQL WHERE, SET LOCAL in separate statement
+- Atomic provider switching: clear embeddings + update config + REINDEX CONCURRENTLY [AAP-B6]
+- Embedding invalidation in all 4 ingestion routes (cron, articles, upload, push)
+- 24 new tests (cache 6, OpenAI 3, Cohere 3, batch 6, similarity 4, switch 2)
+
+### Decisions
+- Cohere uses direct fetch (no SDK) — single endpoint doesn't justify a dependency
+- Provider config is per-project via StrategyConfig, with EMBEDDING_PROVIDER env fallback
+- Cache check includes defensive hash comparison per DECISION-001 (defense in depth)
+- Blind-upsert routes use unconditional embedding invalidation; hash-comparing routes invalidate conditionally
+- SET LOCAL for ef_search must be in separate $executeRaw inside $transaction (PostgreSQL rejects multi-statement prepared statements)
+
+### Next
+- Phase 5: Crosslink Strategy & Analysis

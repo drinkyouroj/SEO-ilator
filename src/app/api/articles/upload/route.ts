@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth/session";
 import { scopedPrisma } from "@/lib/db";
 import { parseHTML, parseMarkdown } from "@/lib/ingestion/parser";
 import { normalizeArticle } from "@/lib/ingestion/normalizer";
+import { invalidateEmbedding } from "@/lib/embeddings/batch";
 
 export const dynamic = "force-dynamic";
 
@@ -257,5 +258,10 @@ async function upsertArticle(
       httpStatus: normalized.metadata.httpStatus,
     },
   });
+  try {
+    await invalidateEmbedding(existing.id);
+  } catch (err) {
+    console.warn(`[upload] Article ${existing.id} saved but embedding invalidation failed:`, err);
+  }
   return { didCreate: false, didUpdate: true, skipped: false };
 }
