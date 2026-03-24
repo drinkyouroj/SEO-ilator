@@ -71,7 +71,7 @@ export function getDistinctiveWords(text: string): string[] {
 
 export function sanitizeAnchorText(raw: string): string {
   // Strip HTML tags
-  let text = raw.replace(/<[^>]*>/g, "");
+  const text = raw.replace(/<[^>]*>/g, "");
   // Reject if script or javascript: URI remains after stripping
   if (/<script/i.test(text) || /javascript:/i.test(text)) {
     return "";

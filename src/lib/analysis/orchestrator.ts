@@ -162,7 +162,8 @@ export async function processAnalysisRun(
     const rankedRecs = dedupAndRank(allRecs);
 
     // 9. [AAP-B4] In a transaction: supersede previous pending recs, insert new recs
-    await prisma.$transaction(async (tx: typeof prisma) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await prisma.$transaction(async (tx: any) => {
       // Mark previous pending recommendations as superseded
       await tx.recommendation.updateMany({
         where: {
@@ -193,10 +194,10 @@ export async function processAnalysisRun(
           charOffsetEnd: rec.charOffsetEnd ?? null,
           suggestion: rec.suggestion ?? undefined,
           status: "pending",
-        }));
+        })) as Record<string, unknown>[];
 
         try {
-          await tx.recommendation.createMany({ data: recData });
+          await tx.recommendation.createMany({ data: recData as never });
         } catch (err) {
           // [AAP-B10] Handle FK violations gracefully — log and skip
           const message = err instanceof Error ? err.message : String(err);
