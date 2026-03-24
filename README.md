@@ -8,7 +8,7 @@ Extensible SEO engine that analyzes article indexes and recommends internal cros
 - **Database:** PostgreSQL with pgvector (Railway in production)
 - **ORM:** Prisma
 - **Hosting:** Vercel (app) + Railway (database)
-- **Key deps:** cheerio, openai/cohere SDK, zod, tailwindcss
+- **Key deps:** cheerio, openai/cohere/groq embeddings, zod, tailwindcss, @sentry/nextjs
 
 ## Prerequisites
 
