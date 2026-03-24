@@ -48,49 +48,37 @@ export const authConfig: NextAuthConfig = {
   },
 
   callbacks: {
-    async signIn({ user }) {
-      if (!user.id) return true;
-
-      // Auto-create a default Project on first login
-      try {
-        const existingProject = await prisma.project.findFirst({
-          where: { userId: user.id },
-        });
-
-        if (!existingProject) {
-          await prisma.project.create({
-            data: {
-              userId: user.id,
-              name: "My First Project",
-            },
-          });
-        }
-      } catch (error) {
-        console.error("[auth/signIn] Failed to create default project:", {
-          userId: user.id,
-          error,
-        });
-        // Fail the sign-in so the user is not left in an unusable state
-        return false;
-      }
-
+    async signIn() {
+      // Always allow sign-in. Project creation is handled in the session
+      // callback because the User record may not exist in the DB yet
+      // during OAuth signIn (the PrismaAdapter creates it afterward).
       return true;
     },
 
     async session({ session, user }) {
-      // Attach projectId to session so downstream code can scope queries
-      const project = await prisma.project.findFirst({
+      // Auto-create a default Project on first session if none exists.
+      let project = await prisma.project.findFirst({
         where: { userId: user.id },
         orderBy: { createdAt: "asc" },
       });
 
       if (!project) {
-        console.error("[auth/session] No project found for user:", {
-          userId: user.id,
-        });
-        throw new Error(
-          "No project found for authenticated user. Sign-in may have partially failed."
-        );
+        try {
+          project = await prisma.project.create({
+            data: {
+              userId: user.id,
+              name: "My First Project",
+            },
+          });
+        } catch (error) {
+          console.error("[auth/session] Failed to create default project:", {
+            userId: user.id,
+            error,
+          });
+          throw new Error(
+            "Failed to initialize your account. Please try signing in again."
+          );
+        }
       }
 
       session.user.id = user.id;
