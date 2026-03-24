@@ -1,8 +1,7 @@
 /**
  * CrosslinkStrategy — identifies internal crosslinking opportunities
- * using keyword matching and fuzzy title matching (Dice coefficient).
- *
- * Semantic matching (embeddings) is handled separately and merged in Task 4.
+ * using keyword matching and fuzzy title matching (Dice coefficient),
+ * and semantic matching via pgvector embeddings.
  */
 
 import type {
@@ -11,6 +10,7 @@ import type {
   StrategyRecommendation,
   ArticleSummary,
 } from "./types";
+import { findSimilarArticles } from "@/lib/embeddings/similarity";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -175,6 +175,69 @@ export class CrosslinkStrategy implements SEOStrategy {
       const rec = this.matchTarget(article, target, sourceBody);
       if (rec) {
         recommendations.push(rec);
+      }
+    }
+
+    // --- Semantic matching via pgvector ---
+    if (article.hasEmbedding && recommendations.length < maxNew) {
+      const keywordTargetIds = new Set(recommendations.map((r) => r.targetArticleId));
+
+      const similarArticles = await findSimilarArticles(
+        context.projectId,
+        article.id,
+        20,
+        0.751,
+      );
+
+      // Build a lookup map for the article index
+      const indexById = new Map<string, ArticleSummary>(
+        articleIndex.map((a) => [a.id, a]),
+      );
+
+      for (const similar of similarArticles) {
+        if (recommendations.length >= maxNew) break;
+
+        // Skip self
+        if (similar.id === article.id) continue;
+
+        const target = indexById.get(similar.id);
+        if (!target) continue;
+
+        // Skip noindex
+        if (target.noindex) continue;
+
+        // Skip error pages
+        if (target.httpStatus !== null && target.httpStatus >= 400) continue;
+
+        // Skip already-linked targets
+        if (existingLinkUrls.has(target.url)) continue;
+
+        // Skip targets already found by keyword matching
+        if (keywordTargetIds.has(similar.id)) continue;
+
+        const anchorText = sanitizeAnchorText(target.title);
+        if (!anchorText) continue;
+
+        const confidence = similar.similarity;
+        const severity: "critical" | "warning" | "info" =
+          confidence >= 0.85 ? "critical" : confidence >= 0.6 ? "warning" : "info";
+
+        recommendations.push({
+          strategyId: this.id,
+          sourceArticleId: article.id,
+          targetArticleId: similar.id,
+          type: "crosslink",
+          severity,
+          title: `Link to "${target.title}"`,
+          description: `Found semantically similar article (similarity: ${confidence.toFixed(2)}).`,
+          anchorText,
+          confidence,
+          matchingApproach: "semantic",
+          suggestion: {
+            anchorText,
+            targetUrl: target.url,
+          },
+        });
       }
     }
 

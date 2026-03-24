@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ArticleSummary, AnalysisContext, StrategyRecommendation } from "@/lib/strategies/types";
 import { CrosslinkStrategy } from "@/lib/strategies/crosslink";
+import { findSimilarArticles } from "@/lib/embeddings/similarity";
 
 vi.mock("@/lib/embeddings/similarity", () => ({
   findSimilarArticles: vi.fn().mockResolvedValue([]),
@@ -306,5 +307,43 @@ describe("CrosslinkStrategy", () => {
       expect(rec.anchorText).not.toMatch(/javascript:/i);
     }
     // If rejected entirely due to sanitization, that's also acceptable
+  });
+});
+
+describe("CrosslinkStrategy — semantic matching", () => {
+  const strategy = new CrosslinkStrategy();
+
+  beforeEach(() => {
+    vi.mocked(findSimilarArticles).mockResolvedValue([]);
+  });
+
+  // 16
+  it("finds_semantic_matches_via_pgvector", async () => {
+    const mockSimilar = vi.mocked(findSimilarArticles);
+    mockSimilar.mockResolvedValueOnce([
+      { id: "a2", url: "https://example.com/similar", title: "Similar Topic", similarity: 0.85 },
+    ]);
+
+    const source = makeArticle({ id: "a1", wordCount: 500, hasEmbedding: true });
+    const target = makeArticle({ id: "a2", title: "Similar Topic", url: "https://example.com/similar", hasEmbedding: true });
+    const bodies = { a1: "This article covers various topics in depth. " + "word ".repeat(300) };
+    const ctx = makeContext(source, [source, target], bodies);
+
+    const recs = await strategy.analyze(ctx);
+    const semantic = recs.filter((r) => r.matchingApproach === "semantic");
+    expect(semantic.length).toBeGreaterThanOrEqual(1);
+    expect(semantic[0]?.targetArticleId).toBe("a2");
+  });
+
+  // 17
+  it("skips_semantic_when_source_has_no_embedding", async () => {
+    const source = makeArticle({ id: "a1", wordCount: 500, hasEmbedding: false });
+    const target = makeArticle({ id: "a2", title: "Topic", hasEmbedding: true });
+    const bodies = { a1: "This article covers various topics in depth. " + "word ".repeat(300) };
+    const ctx = makeContext(source, [source, target], bodies);
+
+    const recs = await strategy.analyze(ctx);
+    const semantic = recs.filter((r) => r.matchingApproach === "semantic");
+    expect(semantic).toHaveLength(0);
   });
 });
