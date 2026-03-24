@@ -64,3 +64,46 @@
 
 ### Next
 - Phase 2: Dashboard Shell & Layout
+
+## 2026-03-23 — Phase 2: Dashboard Shell & Layout
+
+### Done
+- AppShell, Sidebar, Header, UserMenu layout components
+- DataTable with renderMobileCard prop [AAP-F6]
+- Shared feedback components: ProgressBar, Spinner, Toast, ErrorBanner, SkeletonLoader
+- Auth pages: sign-in, verify-request, error
+- ConfirmDialog form component
+- Pagination, SeverityBadge, StatusBadge data display components
+
+### Next
+- Phase 3: Ingestion Pipeline
+
+## 2026-03-23 — Phase 3: Ingestion Pipeline
+
+### Done
+- Prisma migration: retryAfter field + composite index on IngestionTask
+- HTML/Markdown parser (cheerio + marked) with metadata extraction and empty-body detection [AAP-O1]
+- Article normalizer with SHA-256 body/title hashing
+- SSRF guard with DNS resolution and private IP rejection [AAP-B1]
+- robots.txt parser and per-domain cache [DECISION-002]
+- Crawler with redirect chain validation and SSRF checks on each hop [AAP-B1]
+- Database-backed queue: createJob, cancelJob, claimTasks (CAS), failTask (classified retry), recoverZombies (10-min threshold), finalizeJob [AAP-B2, AAP-F9]
+- Sitemap parser with depth limit (2), size limit (50MB), URL cap (10k), dedup [AAP-O10]
+- API: POST /api/articles — sitemap/URL-list ingestion with hybrid sync/async routing
+- API: POST /api/articles/upload — file upload (HTML/MD/JSON) with size limits [AAP-F7]
+- API: POST /api/articles/push — API push with existingLinks extraction [AAP-O7]
+- API: GET /api/articles/[id] — article detail
+- API: DELETE /api/articles/[id] — with active analysis check [AAP-B10]
+- API: GET /api/jobs/[id] — job status with cursor-based task pagination
+- API: POST /api/jobs/[id]/cancel — job cancellation [AAP-F9]
+- Cron worker: /api/cron/crawl with zombie recovery and on-demand trigger
+- 89 tests passing (13 test files), 0 type errors, 0 lint errors
+
+### Decisions
+- v1.0 uses sequential crawling (concurrency=1 for all presets); deviation from DECISION-002 documented
+- File uploads use synthetic URL scheme: upload://<filename>
+- On-demand cron trigger via Next.js after() with daily cron as safety net
+- Crawler separates fetchRobotsTxt() from crawlUrl() for clean testing
+
+### Next
+- Phase 4: Embedding Provider & Cache
