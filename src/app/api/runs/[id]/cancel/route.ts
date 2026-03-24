@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/session";
-import { scopedPrisma } from "@/lib/db";
-import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -11,36 +10,32 @@ export async function POST(
 ) {
   const { projectId } = await requireAuth();
   const { id } = await params;
-  const db = scopedPrisma(projectId);
 
-  // Check current status
-  const run = await db.analysisRun.findUnique({
-    where: { id },
-    select: { status: true },
-  });
+  // Atomic conditional update — eliminates TOCTOU race with orchestrator
+  // Only cancels runs that are currently in a cancellable state
+  const result = await prisma.$executeRaw`
+    UPDATE "AnalysisRun"
+    SET status = 'cancelled', "completedAt" = NOW()
+    WHERE id = ${id} AND "projectId" = ${projectId}
+      AND status IN ('pending', 'running')
+  `;
 
-  if (!run) {
-    return NextResponse.json({ error: "Run not found" }, { status: 404 });
-  }
+  if (result === 0) {
+    // Either not found or already in terminal state
+    const run = await prisma.analysisRun.findFirst({
+      where: { id, projectId },
+      select: { status: true },
+    });
 
-  if (run.status === "completed" || run.status === "failed") {
+    if (!run) {
+      return NextResponse.json({ error: "Run not found" }, { status: 404 });
+    }
+
     return NextResponse.json(
-      { error: "Cannot cancel a run that is already completed or failed" },
+      { error: `Cannot cancel a run with status "${run.status}"` },
       { status: 409 }
     );
   }
 
-  try {
-    const updated = await db.analysisRun.update({
-      where: { id },
-      data: { status: "cancelled", completedAt: new Date() },
-    });
-    return NextResponse.json({ run: updated });
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
-      return NextResponse.json({ error: "Run not found" }, { status: 404 });
-    }
-    console.error(`[runs/${id}/cancel] Failed:`, err);
-    return NextResponse.json({ error: "Failed to cancel run" }, { status: 500 });
-  }
+  return NextResponse.json({ status: "cancelled", runId: id });
 }

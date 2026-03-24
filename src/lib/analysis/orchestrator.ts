@@ -149,12 +149,27 @@ export async function processAnalysisRun(
         skippedArticleCount++;
       }
 
-      // Heartbeat after each batch
+      // Heartbeat after each batch + cancellation check
       if ((i + 1) % HEARTBEAT_BATCH_SIZE === 0 || i === articles.length - 1) {
-        await prisma.analysisRun.update({
-          where: { id: runId },
-          data: { lastHeartbeatAt: new Date() },
-        });
+        try {
+          await prisma.analysisRun.update({
+            where: { id: runId },
+            data: { lastHeartbeatAt: new Date() },
+          });
+
+          // Check if run was cancelled — respect cancellation mid-flight
+          const current = await prisma.analysisRun.findUnique({
+            where: { id: runId },
+            select: { status: true },
+          });
+          if (current?.status === "cancelled") {
+            console.warn(`[orchestrator] Run ${runId} was cancelled — stopping processing`);
+            return; // Exit without overwriting the cancelled status
+          }
+        } catch (heartbeatErr) {
+          // Non-fatal — log and continue processing
+          console.warn(`[orchestrator] Heartbeat update failed for run ${runId}:`, heartbeatErr);
+        }
       }
     }
 
@@ -199,12 +214,28 @@ export async function processAnalysisRun(
         try {
           await tx.recommendation.createMany({ data: recData as never });
         } catch (err) {
-          // [AAP-B10] Handle FK violations gracefully — log and skip
+          // [AAP-B10] Handle FK violations gracefully — fall back to individual inserts
           const message = err instanceof Error ? err.message : String(err);
-          if (message.includes("Foreign key constraint")) {
+          if (message.includes("Foreign key") || message.includes("P2003")) {
             console.warn(
-              `[orchestrator] FK violation inserting recommendations — some articles may have been deleted. Skipping batch.`
+              `[orchestrator] FK violation in batch createMany — falling back to individual inserts`
             );
+            // Insert individually so one bad FK doesn't lose the whole batch
+            let inserted = 0;
+            for (const rec of recData) {
+              try {
+                await tx.recommendation.create({ data: rec as never });
+                inserted++;
+              } catch (individualErr) {
+                const msg = individualErr instanceof Error ? individualErr.message : String(individualErr);
+                if (msg.includes("Foreign key") || msg.includes("P2003")) {
+                  console.warn(`[orchestrator] Skipping rec for deleted article: ${(rec as Record<string, unknown>).sourceArticleId} -> ${(rec as Record<string, unknown>).targetArticleId}`);
+                } else {
+                  throw individualErr;
+                }
+              }
+            }
+            console.warn(`[orchestrator] Individual insert fallback: ${inserted}/${recData.length} succeeded`);
           } else {
             throw err;
           }
@@ -212,18 +243,17 @@ export async function processAnalysisRun(
       }
     });
 
-    // 10. Transition to "completed" with counters
-    await prisma.analysisRun.update({
-      where: { id: runId },
-      data: {
-        status: "completed",
-        completedAt: new Date(),
-        articleCount: articles.length,
-        recommendationCount: rankedRecs.length,
-        embeddingsCached,
-        embeddingsGenerated,
-      },
-    });
+    // 10. Transition to "completed" — conditional update to avoid overwriting "cancelled"
+    await prisma.$executeRaw`
+      UPDATE "AnalysisRun"
+      SET status = 'completed',
+          "completedAt" = NOW(),
+          "articleCount" = ${articles.length},
+          "recommendationCount" = ${rankedRecs.length},
+          "embeddingsCached" = ${embeddingsCached},
+          "embeddingsGenerated" = ${embeddingsGenerated}
+      WHERE id = ${runId} AND status = 'running'
+    `;
   } catch (err) {
     // 11. On ANY error: transition to "failed"
     const errorMessage = err instanceof Error ? err.message : String(err);

@@ -19,11 +19,23 @@ export class StrategyRegistry {
     return Array.from(this.strategies.values());
   }
 
+  /**
+   * Run all registered strategies against the given context.
+   * Per-strategy error isolation: one failing strategy doesn't lose others' results.
+   */
   async analyzeWithAll(context: AnalysisContext): Promise<StrategyRecommendation[]> {
     const results: StrategyRecommendation[] = [];
     for (const strategy of this.strategies.values()) {
-      const recs = await strategy.analyze(context);
-      results.push(...recs);
+      try {
+        const recs = await strategy.analyze(context);
+        results.push(...recs);
+      } catch (err) {
+        console.error(
+          `[registry] Strategy "${strategy.id}" failed for article ${context.article.id}:`,
+          err instanceof Error ? err.message : err
+        );
+        // Continue with remaining strategies — don't lose their recommendations
+      }
     }
     return results;
   }

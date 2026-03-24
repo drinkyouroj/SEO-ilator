@@ -71,11 +71,17 @@ export function getDistinctiveWords(text: string): string[] {
 
 export function sanitizeAnchorText(raw: string): string {
   // Strip HTML tags
-  const text = raw.replace(/<[^>]*>/g, "");
-  // Reject if script or javascript: URI remains after stripping
-  if (/<script/i.test(text) || /javascript:/i.test(text)) {
-    return "";
-  }
+  let text = raw.replace(/<[^>]*>/g, "");
+  // Decode common HTML entities that could bypass checks
+  text = text
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
+  // Reject if javascript: URI (including entity-encoded variants)
+  if (/javascript\s*:/i.test(text)) return "";
+  // Reject event handler patterns (e.g., onmouseover=)
+  if (/\bon\w+\s*=/i.test(text)) return "";
+  // Reject any remaining angle brackets (incomplete tag stripping)
+  if (/<|>/g.test(text)) return "";
   return text.trim();
 }
 
@@ -179,6 +185,8 @@ export class CrosslinkStrategy implements SEOStrategy {
     }
 
     // --- Semantic matching via pgvector ---
+    // Wrapped in try-catch so a pgvector failure doesn't lose keyword recommendations
+    try {
     if (article.hasEmbedding && recommendations.length < maxNew) {
       const keywordTargetIds = new Set(recommendations.map((r) => r.targetArticleId));
 
@@ -239,6 +247,12 @@ export class CrosslinkStrategy implements SEOStrategy {
           },
         });
       }
+    }
+    } catch (semanticErr) {
+      // Semantic matching failure should not lose keyword recommendations
+      console.warn(
+        `[crosslink] Semantic matching failed for article ${article.id}: ${semanticErr instanceof Error ? semanticErr.message : semanticErr}`
+      );
     }
 
     return recommendations;
