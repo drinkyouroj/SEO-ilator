@@ -16,7 +16,7 @@ import { findSimilarArticles } from "@/lib/embeddings/similarity";
 // Constants
 // ---------------------------------------------------------------------------
 
-const MIN_SOURCE_WORDS = 300;
+const MIN_SOURCE_WORDS = 50;
 const MIN_DISTINCTIVE_WORDS = 3;
 const DISTINCTIVE_COVERAGE = 0.6;
 const MAX_NEW_LINKS = 10;
