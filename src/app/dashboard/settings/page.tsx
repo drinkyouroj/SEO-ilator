@@ -8,7 +8,7 @@ interface SettingsData {
   similarityThreshold: number;
   fuzzyTolerance: number;
   maxLinksPerPage: number;
-  embeddingProvider: "openai" | "cohere";
+  embeddingProvider: "openai" | "cohere" | "groq";
 }
 
 interface UserPlan {
@@ -42,7 +42,7 @@ export default function SettingsPage() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [showProviderWarning, setShowProviderWarning] = useState(false);
-  const [pendingProvider, setPendingProvider] = useState<"openai" | "cohere" | null>(null);
+  const [pendingProvider, setPendingProvider] = useState<"openai" | "cohere" | "groq" | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Fetch current settings on mount
@@ -95,7 +95,7 @@ export default function SettingsPage() {
 
   // [AAP-B6] Provider switch confirmation handler
   const handleProviderChange = useCallback(
-    (provider: "openai" | "cohere") => {
+    (provider: "openai" | "cohere" | "groq") => {
       if (settings && provider !== settings.embeddingProvider) {
         setPendingProvider(provider);
         setShowProviderWarning(true);
@@ -278,12 +278,13 @@ export default function SettingsPage() {
                 id="embeddingProvider"
                 value={settings.embeddingProvider}
                 onChange={(e) =>
-                  handleProviderChange(e.target.value as "openai" | "cohere")
+                  handleProviderChange(e.target.value as "openai" | "cohere" | "groq")
                 }
                 className="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white focus-visible:ring-2 focus-visible:ring-blue-500"
               >
                 <option value="openai">OpenAI (text-embedding-3-small)</option>
                 <option value="cohere">Cohere (embed-english-v3.0)</option>
+                <option value="groq">Groq (llama3-embedding-large)</option>
               </select>
             </div>
           </div>

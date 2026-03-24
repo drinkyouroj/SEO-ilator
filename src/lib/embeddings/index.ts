@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { isValidProvider, PROVIDER_DIMENSIONS } from "./providers";
 import { OpenAIEmbeddingProvider } from "./providers/openai";
 import { CohereEmbeddingProvider } from "./providers/cohere";
+import { GroqEmbeddingProvider } from "./providers/groq";
 import type { EmbeddingProvider } from "./types";
 
 const DEFAULT_PROVIDER = "openai/text-embedding-3-small";
@@ -52,6 +53,8 @@ function createProvider(modelId: string): EmbeddingProvider {
       return new OpenAIEmbeddingProvider();
     case "cohere/embed-english-v3.0":
       return new CohereEmbeddingProvider();
+    case "groq/llama3-embedding-large":
+      return new GroqEmbeddingProvider();
     default:
       throw new Error(`No adapter for provider: ${modelId}`);
   }
