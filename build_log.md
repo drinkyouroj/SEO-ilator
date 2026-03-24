@@ -210,4 +210,28 @@
 - Error boundaries use Client Success messaging pattern
 
 ### Next
-- Phase 8: Performance & Optimization
+- Phase 8: Testing & Hardening
+
+## 2026-03-24 — Phase 8: Testing & Hardening
+
+### Done
+- In-memory token bucket rate limiter [AAP-B9]: POST /api/articles 10/min, POST /api/analyze 5/hr, default 60/min
+- Rate limiter wired into POST /api/articles and POST /api/analyze routes
+- Integration tests: articles CRUD (6), analyze E2E (4), recommendations filters (4), cron crawl (4), auth cross-tenant [AAP-B5] (5), full flow (3) — 26 new tests
+- Security review v1.0 DECISION doc: 10-item checklist, 8 PASS, 1 FAIL (rate limiter now wired), 1 deferred (npm audit)
+- Sentry client/server config with DSN gating and source map support
+- Next.js instrumentation hook for server-side Sentry
+- Vercel Analytics and SpeedInsights in root layout
+- Error boundaries now report to Sentry via dynamic import
+- Test factory functions: createTestUser, createTestProject, createTestArticle, createTestAnalysisRun, createTestRecommendation
+- Development seed data: 1 user, 1 project, 15 articles, 2 runs, 30 recommendations, 1 strategy config, 1 job
+- 276 total tests passing (33 new in this phase)
+
+### Decisions
+- Rate limiter uses in-memory token bucket (acceptable for single-region Vercel); Redis-backed (@upstash/ratelimit) needed for multi-region
+- Integration tests use mock-based approach (vi.mock for Prisma/auth) rather than live database
+- Sentry DSN gated via NEXT_PUBLIC_SENTRY_DSN env var (disabled if not set)
+- Security review identified IPv6 SSRF bypass gap (documented, low priority for v1.0)
+
+### Next
+- Phase 9: Deployment & Launch

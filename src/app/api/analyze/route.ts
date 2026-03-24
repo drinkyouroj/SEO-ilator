@@ -8,6 +8,7 @@ import { getProvider } from "@/lib/embeddings";
 import { checkEmbeddingCache } from "@/lib/embeddings/cache";
 import { Prisma } from "@prisma/client";
 import type { ArticleWithEmbedding } from "@/lib/embeddings/types";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -18,8 +19,19 @@ const BodySchema = z.object({
 
 export async function POST(request: Request) {
   // ── 1. Auth ──────────────────────────────────────────────────────────────
-  const { projectId } = await requireAuth();
+  let projectId: string;
+  let userId: string;
+  try {
+    ({ projectId, userId } = await requireAuth());
+  } catch (thrown) {
+    if (thrown instanceof Response) return thrown;
+    throw thrown;
+  }
   const db = scopedPrisma(projectId);
+
+  // ── 1b. Rate limit [AAP-B9] ─────────────────────────────────────────────
+  const rateLimitResponse = checkRateLimit(userId, "POST", "/api/analyze");
+  if (rateLimitResponse) return rateLimitResponse;
 
   // ── 2. Parse body ─────────────────────────────────────────────────────────
   let body: z.infer<typeof BodySchema>;
