@@ -209,7 +209,7 @@ describe("CrosslinkStrategy", () => {
   });
 
   // 11
-  it("uses_conservative_defaults_when_existingLinks_is_null", async () => {
+  it("still_produces_recs_when_existingLinks_is_null", async () => {
     const targets: ArticleSummary[] = [];
     const bodyParts: string[] = [];
     for (let i = 0; i < 12; i++) {
@@ -225,13 +225,13 @@ describe("CrosslinkStrategy", () => {
 
     const recs = await strategy.analyze(ctx);
 
-    // With null existingLinks assumed as 5, max new = 10, so at most 5 new links (10 - 5 = 5)
-    expect(recs.length).toBeLessThanOrEqual(5);
+    // maxNew defaults to DEFAULT_MAX_NEW_RECS (10) — existingLinks no longer reduces budget
+    expect(recs.length).toBeLessThanOrEqual(10);
     expect(recs.length).toBeGreaterThan(0);
   });
 
   // 12
-  it("respects_max_links_per_page", async () => {
+  it("respects_maxLinksPerPage_from_settings", async () => {
     const targets: ArticleSummary[] = [];
     const bodyParts: string[] = [];
     for (let i = 0; i < 20; i++) {
@@ -243,11 +243,33 @@ describe("CrosslinkStrategy", () => {
     const bodies = {
       src: bodyParts.join(" ") + " " + "word ".repeat(300),
     };
-    const ctx = makeContext(source, [source, ...targets], bodies);
+    // Set maxLinksPerPage to 3 via settings
+    const ctx = makeContext(source, [source, ...targets], bodies, { maxLinksPerPage: 3 });
 
     const recs = await strategy.analyze(ctx);
 
-    expect(recs.length).toBeLessThanOrEqual(10);
+    expect(recs.length).toBeLessThanOrEqual(3);
+    expect(recs.length).toBeGreaterThan(0);
+  });
+
+  // 12b
+  it("produces_recs_for_articles_with_many_existing_links", async () => {
+    const existingLinks = Array.from({ length: 50 }, (_, i) => ({
+      href: `https://example.com/existing-${i}`,
+      anchorText: `Existing Link ${i}`,
+    }));
+    const source = makeArticle({ id: "src", wordCount: 5000, existingLinks });
+    const target = makeArticle({ id: "tgt", title: "React Hooks Guide" });
+    const bodies = {
+      src: "Learn about building apps. You should read the React Hooks Guide to understand state management. " + "word ".repeat(300),
+    };
+    const ctx = makeContext(source, [source, target], bodies);
+
+    const recs = await strategy.analyze(ctx);
+
+    // Articles with many existing links should still get recommendations
+    const rec = recs.find((r) => r.targetArticleId === "tgt");
+    expect(rec).toBeDefined();
   });
 
   // 13
