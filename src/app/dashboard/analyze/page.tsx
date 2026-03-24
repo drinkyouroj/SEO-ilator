@@ -1,7 +1,5 @@
 "use client";
 
-// src/app/dashboard/analyze/page.tsx
-
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ProgressBar } from "@/components/feedback/ProgressBar";
 import { Spinner } from "@/components/feedback/Spinner";
@@ -13,9 +11,11 @@ import { apiFetch } from "@/lib/api-client";
 // Constants
 // ---------------------------------------------------------------------------
 
+// Polling [AAP-F1] — intervals adjusted to 5s/10s/20s/30s from spec's 3s to reduce load
 const INITIAL_INTERVAL = 5000;
 const MAX_INTERVAL = 30000;
 const BACKOFF_FACTOR = 2;
+const MAX_CONSECUTIVE_FAILURES = 5;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -368,8 +368,15 @@ export default function AnalyzePage() {
           setPageState(next);
           return;
         }
-      } catch {
+      } catch (err) {
+        console.error("[analyze] poll failed:", err);
         consecutiveFailures++;
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          stopped = true;
+          setDryRunError("Lost connection to the server. Please refresh the page.");
+          setPageState("FAILED");
+          return;
+        }
         interval = Math.min(interval * BACKOFF_FACTOR, MAX_INTERVAL);
       }
 
@@ -414,8 +421,9 @@ export default function AnalyzePage() {
     try {
       await apiFetch(`/api/runs/${runId}/cancel`, { method: "POST" });
       // Polling will pick up the cancelled status naturally
-    } catch {
-      // Non-fatal — polling will still detect terminal state
+    } catch (err) {
+      console.error("[analyze] cancel failed:", err);
+      setDryRunError("Failed to cancel analysis. Please try again.");
     } finally {
       setIsCancelling(false);
     }

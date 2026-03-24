@@ -3,5 +3,6 @@ export function serializeJson(rows: Record<string, unknown>[]): string {
 }
 
 export function jsonContentDisposition(filename: string): string {
-  return `attachment; filename="${filename}"`;
+  const safe = filename.replace(/"/g, '\\"').replace(/[\r\n]/g, "");
+  return `attachment; filename="${safe}"`;
 }

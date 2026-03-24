@@ -39,6 +39,38 @@ const STATUS_TABS: { label: string; value: RecStatus | "all" }[] = [
   { label: "Dismissed", value: "dismissed" },
 ];
 
+async function downloadExport(
+  articleId: string,
+  format: "csv" | "json",
+  addToast: (t: { message: string; variant: "error" | "success" }) => void,
+) {
+  try {
+    const res = await apiFetch(
+      `/api/recommendations?format=${format}&articleId=${encodeURIComponent(articleId)}`,
+    );
+    if (!res.ok) {
+      const data = await res.json().catch((parseErr: unknown) => {
+          console.error("[RecommendationsSection] failed to parse error response:", { status: res.status, parseErr });
+          return {};
+        });
+      addToast({
+        message: (data as { message?: string }).message ?? `Export failed (${res.status})`,
+        variant: "error",
+      });
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `recommendations.${format}`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch {
+    addToast({ message: "Export failed. Please try again.", variant: "error" });
+  }
+}
+
 export function RecommendationsSection({ articleId }: RecommendationsSectionProps) {
   const { addToast } = useToast();
 
@@ -72,7 +104,10 @@ export function RecommendationsSection({ articleId }: RecommendationsSectionProp
 
         const res = await apiFetch(`/api/recommendations?${params.toString()}`);
         if (!res.ok) {
-          const json = await res.json().catch(() => ({}));
+          const json = await res.json().catch((parseErr: unknown) => {
+          console.error("[RecommendationsSection] failed to parse error response:", { status: res.status, parseErr });
+          return {};
+        });
           throw new Error((json as { error?: string }).error ?? `HTTP ${res.status}`);
         }
         const json = (await res.json()) as {
@@ -83,9 +118,10 @@ export function RecommendationsSection({ articleId }: RecommendationsSectionProp
         setNextCursor(json.nextCursor);
         setSelected(new Set());
       } catch (err) {
-        if (err instanceof Error && err.message !== "Session expired") {
-          setError(err.message);
-        }
+        // apiFetch redirects on 401 and throws "Session expired" — skip the error banner for that
+        if (err instanceof Error && err.message === "Session expired") return;
+        const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+        setError(message);
       } finally {
         setLoading(false);
       }
@@ -121,7 +157,10 @@ export function RecommendationsSection({ articleId }: RecommendationsSectionProp
         });
 
         if (!res.ok) {
-          const json = await res.json().catch(() => ({}));
+          const json = await res.json().catch((parseErr: unknown) => {
+          console.error("[RecommendationsSection] failed to parse error response:", { status: res.status, parseErr });
+          return {};
+        });
           throw new Error(
             (json as { error?: string }).error ?? `HTTP ${res.status}`
           );
@@ -187,7 +226,10 @@ export function RecommendationsSection({ articleId }: RecommendationsSectionProp
         });
 
         if (!res.ok) {
-          const json = await res.json().catch(() => ({}));
+          const json = await res.json().catch((parseErr: unknown) => {
+          console.error("[RecommendationsSection] failed to parse error response:", { status: res.status, parseErr });
+          return {};
+        });
           throw new Error(
             (json as { error?: string }).error ?? `HTTP ${res.status}`
           );
@@ -311,18 +353,14 @@ export function RecommendationsSection({ articleId }: RecommendationsSectionProp
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() =>
-              (window.location.href = `/api/recommendations?format=csv&articleId=${articleId}`)
-            }
+            onClick={() => downloadExport(articleId, "csv", addToast)}
             className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Export CSV
           </button>
           <button
             type="button"
-            onClick={() =>
-              (window.location.href = `/api/recommendations?format=json&articleId=${articleId}`)
-            }
+            onClick={() => downloadExport(articleId, "json", addToast)}
             className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             Export JSON

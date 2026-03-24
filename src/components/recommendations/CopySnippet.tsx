@@ -18,24 +18,36 @@ interface CopySnippetProps {
 
 export function CopySnippet({ anchorText: initialAnchor, targetUrl }: CopySnippetProps) {
   const [anchorText, setAnchorText] = useState(initialAnchor);
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
 
   const escapedAnchor = escapeHtml(anchorText);
   const escapedUrl = escapeHtml(targetUrl);
   const html = `<a href="${escapedUrl}">${escapedAnchor}</a>`;
 
-  const handleCopy = () => {
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(html);
-    } else {
-      // Fallback for non-HTTPS contexts [AAP-F3]
-      const textarea = document.createElement("textarea");
-      textarea.value = html;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
+  const handleCopy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(html);
+      } else {
+        // Fallback for non-HTTPS contexts [AAP-F3] — execCommand is deprecated but remains the only sync alternative
+        const textarea = document.createElement("textarea");
+        textarea.value = html;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        const success = document.execCommand("copy");
+        document.body.removeChild(textarea);
+        if (!success) throw new Error("execCommand copy returned false");
+      }
+      setCopied(true);
+      setCopyError(false);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("[CopySnippet] copy failed:", err);
+      setCopyError(true);
+      setTimeout(() => setCopyError(false), 3000);
     }
   };
 
@@ -58,9 +70,10 @@ export function CopySnippet({ anchorText: initialAnchor, targetUrl }: CopySnippe
       </div>
       <button
         onClick={handleCopy}
-        className="rounded bg-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-600"
+        disabled={!anchorText.trim()}
+        className="rounded bg-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
-        Copy HTML
+        {copied ? "Copied!" : copyError ? "Copy failed" : "Copy HTML"}
       </button>
     </div>
   );
