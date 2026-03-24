@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ArticleSummary, AnalysisContext, StrategyRecommendation } from "@/lib/strategies/types";
-import { CrosslinkStrategy, normalizeUrlForDedup } from "@/lib/strategies/crosslink";
+import { CrosslinkStrategy, normalizeUrlForDedup, buildSemanticAnchorText } from "@/lib/strategies/crosslink";
 import { findSimilarArticles } from "@/lib/embeddings/similarity";
 
 vi.mock("@/lib/embeddings/similarity", () => ({
@@ -403,6 +403,38 @@ describe("normalizeUrlForDedup", () => {
     expect(
       normalizeUrlForDedup("https://example.com/academy/article", "https://example.com")
     ).toBe("https://example.com/academy/article");
+  });
+});
+
+describe("buildSemanticAnchorText", () => {
+  it("strips_site_name_suffix_with_dash", () => {
+    expect(buildSemanticAnchorText("How Poultry Weighing Works - Poultryscales")).toBe(
+      "How Poultry Weighing Works"
+    );
+  });
+
+  it("strips_site_name_suffix_with_pipe", () => {
+    expect(buildSemanticAnchorText("Broiler Growth Data | FarmTech Blog")).toBe(
+      "Broiler Growth Data"
+    );
+  });
+
+  it("strips_title_prefix_after_site_name", () => {
+    expect(buildSemanticAnchorText("How to Weigh Chickens Accurately - Poultryscales")).toBe(
+      "Weigh Chickens Accurately"
+    );
+  });
+
+  it("handles_title_without_suffix", () => {
+    expect(buildSemanticAnchorText("Fluctuations in the growth curve of chickens")).toBe(
+      "Fluctuations in the growth curve of chickens"
+    );
+  });
+
+  it("sanitizes_xss_from_title", () => {
+    const result = buildSemanticAnchorText('<script>alert("x")</script>Poultry Guide');
+    expect(result).not.toMatch(/<script>/i);
+    expect(result).toContain("Poultry Guide");
   });
 });
 

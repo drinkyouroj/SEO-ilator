@@ -125,6 +125,23 @@ export function findInBody(
 }
 
 /**
+ * Build concise anchor text for semantic matches.
+ * Strips site name suffixes (e.g., " - Poultryscales"), common title prefixes,
+ * and sanitizes the result. Returns empty string if unusable.
+ */
+export function buildSemanticAnchorText(title: string): string {
+  // Strip site name suffix (common pattern: " - Site Name" or " | Site Name")
+  let text = title.replace(/\s*[-|]\s*[^-|]+$/, "");
+  // If stripping removed everything, fall back to original
+  if (!text.trim()) text = title;
+  // Strip common title prefixes
+  text = stripTitlePrefix(text);
+  // Sanitize
+  text = sanitizeAnchorText(text);
+  return text;
+}
+
+/**
  * Normalize a URL for dedup comparison:
  * - Resolve relative paths against the base URL
  * - Strip trailing slashes
@@ -255,12 +272,15 @@ export class CrosslinkStrategy implements SEOStrategy {
         // Skip targets already found by keyword matching
         if (keywordTargetIds.has(similar.id)) continue;
 
-        const anchorText = sanitizeAnchorText(target.title);
+        const anchorText = buildSemanticAnchorText(target.title);
         if (!anchorText) continue;
 
         const confidence = similar.similarity;
         const severity: "critical" | "warning" | "info" =
           confidence >= 0.85 ? "critical" : confidence >= 0.6 ? "warning" : "info";
+
+        // Use cleaned title (without site suffix) for the display title
+        const displayTitle = target.title.replace(/\s*[-|]\s*[^-|]+$/, "") || target.title;
 
         recommendations.push({
           strategyId: this.id,
@@ -268,7 +288,7 @@ export class CrosslinkStrategy implements SEOStrategy {
           targetArticleId: similar.id,
           type: "crosslink",
           severity,
-          title: `Link to "${target.title}"`,
+          title: `Link to "${displayTitle}"`,
           description: `Found semantically similar article (similarity: ${confidence.toFixed(2)}).`,
           anchorText,
           confidence,

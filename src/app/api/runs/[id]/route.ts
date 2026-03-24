@@ -38,5 +38,8 @@ export async function GET(
     },
   };
 
-  return NextResponse.json({ run, recommendations: summary });
+  return NextResponse.json({
+    run: { ...run, recommendationsFound: summary.total },
+    recommendations: summary,
+  });
 }
