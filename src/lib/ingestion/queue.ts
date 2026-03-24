@@ -80,7 +80,7 @@ export async function cancelJob(jobId: string, projectId: string): Promise<void>
     });
 
     await tx.ingestionTask.updateMany({
-      where: { jobId, status: "pending" },
+      where: { jobId, status: { in: ["pending", "processing"] } },
       data: { status: "cancelled" },
     });
   });

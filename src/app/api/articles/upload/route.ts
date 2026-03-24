@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth/session";
 import { scopedPrisma } from "@/lib/db";
-import { parseHTML } from "@/lib/ingestion/parser";
-import { parseMarkdown } from "@/lib/ingestion/parser";
+import { parseHTML, parseMarkdown } from "@/lib/ingestion/parser";
 import { normalizeArticle } from "@/lib/ingestion/normalizer";
 
 export const dynamic = "force-dynamic";
@@ -135,7 +134,6 @@ export async function POST(request: Request) {
       }
 
       for (const entry of parsed.data) {
-        // Build a minimal ParsedArticle from manifest entry
         const parsedArticle = {
           url: entry.url,
           title: entry.title,
@@ -147,23 +145,27 @@ export async function POST(request: Request) {
             metaTitle: entry.title,
             metaDescription: null,
             h1: null,
-            h2s: [],
+            h2s: [] as string[],
             noindex: false,
             nofollow: false,
             httpStatus: null,
             responseTimeMs: null,
-            ...(entry.metadata ?? {}),
           },
           parseWarning: null,
         };
 
         const normalized = normalizeArticle(parsedArticle, projectId, "upload");
 
-        const { didCreate, didUpdate, skipped } = await upsertArticle(db, projectId, normalized);
-        if (didCreate) created++;
-        if (didUpdate) updated++;
-        if (skipped && normalized.parseWarning) {
-          warnings.push(`${normalized.url}: ${normalized.parseWarning}`);
+        try {
+          const { didCreate, didUpdate, skipped } = await upsertArticle(db, projectId, normalized);
+          if (didCreate) created++;
+          if (didUpdate) updated++;
+          if (skipped && normalized.parseWarning) {
+            warnings.push(`${normalized.url}: ${normalized.parseWarning}`);
+          }
+        } catch (err) {
+          console.error(`[upload] Failed to upsert article from "${file.name}" (${entry.url}):`, err);
+          warnings.push(`Article "${entry.url}" from "${file.name}" failed to save — skipped`);
         }
       }
     } else {
@@ -186,11 +188,16 @@ export async function POST(request: Request) {
 
       const normalized = normalizeArticle(parsedArticle, projectId, "upload");
 
-      const { didCreate, didUpdate } = await upsertArticle(db, projectId, normalized);
-      if (didCreate) created++;
-      if (didUpdate) updated++;
-      if (normalized.parseWarning) {
-        warnings.push(`${file.name}: ${normalized.parseWarning}`);
+      try {
+        const { didCreate, didUpdate } = await upsertArticle(db, projectId, normalized);
+        if (didCreate) created++;
+        if (didUpdate) updated++;
+        if (normalized.parseWarning) {
+          warnings.push(`${file.name}: ${normalized.parseWarning}`);
+        }
+      } catch (err) {
+        console.error(`[upload] Failed to upsert article from "${file.name}":`, err);
+        warnings.push(`File "${file.name}" failed to save — skipped`);
       }
     }
   }
@@ -206,8 +213,8 @@ async function upsertArticle(
   projectId: string,
   normalized: ReturnType<typeof normalizeArticle>
 ): Promise<{ didCreate: boolean; didUpdate: boolean; skipped: boolean }> {
-  const existing = await db.article.findFirst({
-    where: { url: normalized.url },
+  const existing = await db.article.findUnique({
+    where: { projectId_url: { projectId, url: normalized.url } },
     select: { id: true, bodyHash: true },
   });
 

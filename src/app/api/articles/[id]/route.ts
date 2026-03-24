@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth/session";
 import { scopedPrisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,17 @@ export async function DELETE(
   try {
     await db.article.delete({ where: { id } });
     return new NextResponse(null, { status: 204 });
-  } catch {
-    return NextResponse.json({ error: "Article not found" }, { status: 404 });
+  } catch (err) {
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2025"
+    ) {
+      return NextResponse.json({ error: "Article not found" }, { status: 404 });
+    }
+    console.error(`[articles/${id}] DELETE failed:`, err);
+    return NextResponse.json(
+      { error: "Failed to delete article" },
+      { status: 500 }
+    );
   }
 }

@@ -99,24 +99,41 @@ export async function POST(request: Request) {
   // 6. Upsert with hash-based change detection
   const db = scopedPrisma(projectId);
 
-  const existing = await db.article.findUnique({
-    where: { projectId_url: { projectId, url: normalized.url } },
-    select: { id: true, bodyHash: true },
-  });
+  try {
+    const existing = await db.article.findUnique({
+      where: { projectId_url: { projectId, url: normalized.url } },
+      select: { id: true, bodyHash: true },
+    });
 
-  if (existing) {
-    if (existing.bodyHash === normalized.bodyHash) {
-      // Content unchanged — return existing article without touching DB
-      const article = await db.article.findUnique({
+    if (existing) {
+      if (existing.bodyHash === normalized.bodyHash) {
+        const article = await db.article.findUnique({
+          where: { projectId_url: { projectId, url: normalized.url } },
+        });
+        return NextResponse.json({ article, changed: false }, { status: 200 });
+      }
+
+      const article = await db.article.update({
         where: { projectId_url: { projectId, url: normalized.url } },
+        data: {
+          title: normalized.title,
+          body: normalized.body,
+          bodyHash: normalized.bodyHash,
+          titleHash: normalized.titleHash,
+          wordCount: normalized.wordCount,
+          existingLinks: normalized.existingLinks as never,
+          metadata: normalized.metadata as never,
+          sourceType: normalized.sourceType,
+          parseWarning: normalized.parseWarning,
+        },
       });
-      return NextResponse.json({ article, changed: false }, { status: 200 });
+      return NextResponse.json({ article, changed: true }, { status: 200 });
     }
 
-    // Content changed — update
-    const article = await db.article.update({
-      where: { projectId_url: { projectId, url: normalized.url } },
+    const article = await db.article.create({
       data: {
+        projectId,
+        url: normalized.url,
         title: normalized.title,
         body: normalized.body,
         bodyHash: normalized.bodyHash,
@@ -128,24 +145,12 @@ export async function POST(request: Request) {
         parseWarning: normalized.parseWarning,
       },
     });
-    return NextResponse.json({ article, changed: true }, { status: 200 });
+    return NextResponse.json({ article, changed: true }, { status: 201 });
+  } catch (err) {
+    console.error("[articles/push] Database error:", err);
+    return NextResponse.json(
+      { error: "Failed to save article" },
+      { status: 500 }
+    );
   }
-
-  // New article — create
-  const article = await db.article.create({
-    data: {
-      projectId,
-      url: normalized.url,
-      title: normalized.title,
-      body: normalized.body,
-      bodyHash: normalized.bodyHash,
-      titleHash: normalized.titleHash,
-      wordCount: normalized.wordCount,
-      existingLinks: normalized.existingLinks as never,
-      metadata: normalized.metadata as never,
-      sourceType: normalized.sourceType,
-      parseWarning: normalized.parseWarning,
-    },
-  });
-  return NextResponse.json({ article, changed: true }, { status: 200 });
 }

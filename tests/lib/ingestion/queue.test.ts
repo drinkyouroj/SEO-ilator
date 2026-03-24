@@ -195,10 +195,13 @@ describe("cancelJob", () => {
       })
     );
 
-    // Pending tasks for the job should be cancelled atomically
+    // Pending and processing tasks for the job should be cancelled atomically
     expect(txCapture.ingestionTask.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ jobId: "job-1", status: "pending" }),
+        where: expect.objectContaining({
+          jobId: "job-1",
+          status: { in: ["pending", "processing"] },
+        }),
         data: expect.objectContaining({ status: "cancelled" }),
       })
     );

@@ -30,7 +30,7 @@ export async function fetchRobotsTxt(
   const robotsValidation = await validateUrl(robotsUrl);
 
   if (!robotsValidation.safe) {
-    // Can't validate the robots.txt URL safely — allow all
+    console.warn(`[crawler] SSRF validation failed for robots.txt at ${robotsUrl}: ${robotsValidation.reason}; defaulting to allow-all`);
     robotsCache.set(domain, "");
     return;
   }
@@ -48,13 +48,14 @@ export async function fetchRobotsTxt(
         const text = await robotsRes.text();
         robotsCache.set(domain, text);
       } else {
+        console.warn(`[crawler] robots.txt returned HTTP ${robotsRes.status} for ${domain}; defaulting to allow-all`);
         robotsCache.set(domain, "");
       }
     } finally {
       clearTimeout(timer);
     }
-  } catch {
-    // If robots.txt fetch fails, treat as allow-all
+  } catch (err) {
+    console.warn(`[crawler] Failed to fetch robots.txt for ${domain}: ${err instanceof Error ? err.message : "unknown"}; defaulting to allow-all`);
     robotsCache.set(domain, "");
   }
 }
@@ -191,13 +192,23 @@ export async function crawlUrl(
       failureType: "permanent",
     };
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown fetch error";
+    // Only network-level errors are transient; code bugs and malformed data are permanent
+    const isTransient =
+      err instanceof Error &&
+      (err.name === "AbortError" ||
+        message.includes("ECONNRESET") ||
+        message.includes("ECONNREFUSED") ||
+        message.includes("ETIMEDOUT") ||
+        message.includes("fetch failed") ||
+        message.includes("network"));
     return {
       html: "",
       httpStatus: 0,
       responseTimeMs: Date.now() - startTime,
       redirectChain,
-      error: err instanceof Error ? err.message : "Unknown fetch error",
-      failureType: "transient",
+      error: message,
+      failureType: isTransient ? "transient" : "permanent",
     };
   }
 }
