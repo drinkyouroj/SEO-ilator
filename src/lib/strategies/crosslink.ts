@@ -19,7 +19,7 @@ import { findSimilarArticles } from "@/lib/embeddings/similarity";
 const MIN_SOURCE_WORDS = 50;
 const MIN_DISTINCTIVE_WORDS = 3;
 const DISTINCTIVE_COVERAGE = 0.6;
-const MAX_NEW_LINKS = 10;
+const DEFAULT_MAX_NEW_RECS = 10;
 const NULL_LINKS_ESTIMATE = 5;
 const DICE_THRESHOLD = 0.8;
 
@@ -154,12 +154,13 @@ export class CrosslinkStrategy implements SEOStrategy {
       }
     }
 
-    // Determine max new links budget
-    const existingCount =
-      article.existingLinks !== null
-        ? article.existingLinks.length
-        : NULL_LINKS_ESTIMATE;
-    const maxNew = Math.max(0, MAX_NEW_LINKS - existingCount);
+    // Determine max new recommendations budget.
+    // maxLinksPerPage from settings caps NEW recs (not total links on the page).
+    // Real-world pages often have 30-100+ existing links (nav, footer, inline),
+    // so subtracting existingCount would suppress all recs for content-rich pages.
+    const maxNew = typeof context.settings?.maxLinksPerPage === "number"
+      ? context.settings.maxLinksPerPage
+      : DEFAULT_MAX_NEW_RECS;
 
     const recommendations: StrategyRecommendation[] = [];
 
