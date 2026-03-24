@@ -162,3 +162,29 @@
 
 ### Next
 - Phase 6: Recommendations UI & Export
+
+## 2026-03-24 — Phase 6: Recommendations UI & Export
+
+### Done
+- Zod validation schemas for recommendation update, bulk update, and filter params
+- Cell sanitizer for formula injection prevention (=, +, -, @ prefixed with ') [DECISION-003]
+- CSV serializer: sync with UTF-8 BOM, formula sanitization, correct column order [DECISION-003]
+- JSON serializer with Content-Disposition for download
+- GET /api/recommendations: paginated list with severity/status/run/article filters + CSV/JSON export + 10K count check
+- PATCH /api/recommendations/[id]: accept/dismiss with optimistic locking via updatedAt [AAP-B12]
+- PATCH /api/recommendations/bulk: bulk status update (max 500) with tenant isolation [AAP-B12]
+- CopySnippet: editable anchor text, HTML escaping, clipboard API with execCommand fallback [AAP-F3]
+- RecommendationCard: severity badge, accept/dismiss callbacks, CopySnippet integration
+- Article detail page: recommendations section with filters, bulk actions, optimistic UI [AAP-F2]
+- Analysis page: dryRun pre-summary [AAP-O8], progress polling with exponential backoff [AAP-F1], cancel [AAP-F4]
+- Runs history page: auto-updating running rows, pagination, empty state
+- 19 new tests (sanitize 6, CSV 4, CopySnippet 6, RecommendationCard 3), 172 total
+
+### Decisions
+- CSV uses csv-stringify/sync — 10K count check provides the safety boundary per DECISION-003
+- Optimistic locking uses updatedAt comparison via updateMany (not findFirst + update TOCTOU)
+- RecommendationCard uses callback-prop interface (parent handles PATCH + rollback per AAP-F2)
+- Analysis polling backoff: 5s → 10s → 20s → 30s cap, pause on tab hidden
+
+### Next
+- Phase 7: Settings, Polish
