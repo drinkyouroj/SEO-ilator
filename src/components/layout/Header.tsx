@@ -35,7 +35,7 @@ export function Header({ title, onToggleSidebar, sidebarCollapsed }: HeaderProps
         {/* Hamburger / collapse toggle */}
         <button
           onClick={onToggleSidebar}
-          className="rounded-md p-1.5 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800 md:hidden"
+          className="min-h-[44px] min-w-[44px] rounded-md p-1.5 text-gray-500 hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:text-gray-400 dark:hover:bg-gray-800 md:hidden"
           aria-label={sidebarCollapsed ? "Open sidebar" : "Close sidebar"}
         >
           <svg
@@ -63,7 +63,7 @@ export function Header({ title, onToggleSidebar, sidebarCollapsed }: HeaderProps
         {/* Theme toggle */}
         <button
           onClick={cycleTheme}
-          className="rounded-md px-2 py-1.5 text-sm text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
+          className="min-h-[44px] min-w-[44px] rounded-md px-2 py-1.5 text-sm text-gray-500 hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:text-gray-400 dark:hover:bg-gray-800"
           aria-label={`Current theme: ${themeLabel}. Click to change.`}
           title={`Theme: ${themeLabel}`}
         >

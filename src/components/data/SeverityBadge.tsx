@@ -27,7 +27,10 @@ export interface SeverityBadgeProps
 
 export function SeverityBadge({ severity, className = "" }: SeverityBadgeProps) {
   return (
-    <span className={`${severityBadgeVariants({ severity })} ${className}`.trim()}>
+    <span
+      className={`${severityBadgeVariants({ severity })} ${className}`.trim()}
+      aria-label={`Severity: ${severity}`}
+    >
       {severity}
     </span>
   );
