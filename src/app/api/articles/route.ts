@@ -1,7 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth/session";
-import { prisma } from "@/lib/db";
+import { prisma, scopedPrisma } from "@/lib/db";
 import { parseSitemap } from "@/lib/ingestion/sitemap";
 import { createJob, claimTasks, completeTask, failTask, finalizeJob } from "@/lib/ingestion/queue";
 import { crawlUrl, fetchRobotsTxt } from "@/lib/ingestion/crawler";
@@ -145,6 +145,49 @@ async function processSyncJob(
   } while (taskBatch.length > 0);
 
   await finalizeJob(jobId);
+}
+
+// ── GET /api/articles ────────────────────────────────────────────────────────
+
+export async function GET(request: Request) {
+  let projectId: string;
+  try {
+    ({ projectId } = await requireAuth());
+  } catch (thrown) {
+    if (thrown instanceof Response) return thrown;
+    throw thrown;
+  }
+
+  try {
+    const db = scopedPrisma(projectId);
+    const url = new URL(request.url);
+    const cursor = url.searchParams.get("cursor");
+    const limit = Math.min(parseInt(url.searchParams.get("limit") ?? "20", 10) || 20, 100);
+
+    const articles = await db.article.findMany({
+      select: {
+        id: true,
+        url: true,
+        title: true,
+        wordCount: true,
+        sourceType: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+
+    const hasMore = articles.length > limit;
+    const page = hasMore ? articles.slice(0, limit) : articles;
+    const nextCursor = hasMore ? page[page.length - 1].id : null;
+
+    return NextResponse.json({ articles: page, nextCursor });
+  } catch (err) {
+    console.error("[api/articles] GET failed:", err);
+    return NextResponse.json({ error: "Failed to load articles" }, { status: 500 });
+  }
 }
 
 // ── POST /api/articles ───────────────────────────────────────────────────────
