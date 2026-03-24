@@ -10,6 +10,7 @@ import { normalizeArticle } from "@/lib/ingestion/normalizer";
 import { RobotsCache } from "@/lib/ingestion/robots";
 import { PRESET_DELAYS, type CrawlPreset } from "@/lib/ingestion/types";
 import { invalidateEmbedding } from "@/lib/embeddings/batch";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -151,11 +152,16 @@ async function processSyncJob(
 export async function POST(request: Request) {
   // 1. Auth
   let projectId: string;
+  let userId: string;
   try {
-    ({ projectId } = await requireAuth());
+    ({ projectId, userId } = await requireAuth());
   } catch (response) {
     return response as Response;
   }
+
+  // 1b. Rate limit [AAP-B9]
+  const rateLimitResponse = checkRateLimit(userId, "POST", "/api/articles");
+  if (rateLimitResponse) return rateLimitResponse;
 
   // 2. Parse + validate body
   let rawBody: unknown;
