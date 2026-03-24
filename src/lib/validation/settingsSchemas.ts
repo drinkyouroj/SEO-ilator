@@ -21,7 +21,7 @@ export const settingsUpdateSchema = z.object({
     .min(1, "Max links per page must be at least 1")
     .max(50, "Max links per page must be at most 50")
     .optional(),
-  embeddingProvider: z.enum(["openai", "cohere"]).optional(),
+  embeddingProvider: z.enum(["openai", "cohere", "groq"]).optional(),
   forceReEmbed: z.boolean().optional(),
 });
 
