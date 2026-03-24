@@ -143,10 +143,10 @@ describe("CrosslinkStrategy", () => {
 
   // 6
   it("enforces_minimum_word_count_for_sources", async () => {
-    const source = makeArticle({ id: "src", wordCount: 100 });
+    const source = makeArticle({ id: "src", wordCount: 30 });
     const target = makeArticle({ id: "tgt", title: "React Hooks Guide" });
     const bodies = {
-      src: "React Hooks Guide is great. " + "word ".repeat(50),
+      src: "React Hooks Guide is great. " + "word ".repeat(20),
     };
     const ctx = makeContext(source, [source, target], bodies);
 
