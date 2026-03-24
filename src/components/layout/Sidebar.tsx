@@ -79,6 +79,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       )}
 
       <aside
+        role="navigation"
         className={`
           fixed inset-y-0 left-0 z-40 flex flex-col border-r border-gray-200 bg-white
           transition-transform duration-200 ease-in-out
@@ -132,7 +133,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                     href={item.href}
                     className={`
                       flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium
-                      transition-colors
+                      min-h-[44px] transition-colors
+                      focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2
                       ${
                         isActive
                           ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"

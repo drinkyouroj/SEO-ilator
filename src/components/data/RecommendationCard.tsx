@@ -61,8 +61,8 @@ export function RecommendationCard({
           type="button"
           disabled={!isPending}
           onClick={() => onAccept(id)}
-          className="inline-flex items-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-green-700 dark:hover:bg-green-600"
-          aria-label="Accept"
+          className="inline-flex items-center rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white min-h-[44px] hover:bg-green-700 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-green-700 dark:hover:bg-green-600"
+          aria-label="Accept recommendation"
         >
           Accept
         </button>
@@ -70,8 +70,8 @@ export function RecommendationCard({
           type="button"
           disabled={!isPending}
           onClick={() => onDismiss(id)}
-          className="inline-flex items-center rounded-md bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-          aria-label="Dismiss"
+          className="inline-flex items-center rounded-md bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 min-h-[44px] hover:bg-gray-300 focus-visible:ring-2 focus-visible:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+          aria-label="Dismiss recommendation"
         >
           Dismiss
         </button>

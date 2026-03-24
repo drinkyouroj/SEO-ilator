@@ -41,7 +41,10 @@ export interface StatusBadgeProps extends VariantProps<typeof statusBadgeVariant
 
 export function StatusBadge({ status, className = "" }: StatusBadgeProps) {
   return (
-    <span className={`${statusBadgeVariants({ status })} ${className}`.trim()}>
+    <span
+      className={`${statusBadgeVariants({ status })} ${className}`.trim()}
+      aria-label={`Status: ${status}`}
+    >
       {status === "running" && (
         <svg
           className="h-3 w-3 animate-spin"

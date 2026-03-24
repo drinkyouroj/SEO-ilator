@@ -256,6 +256,9 @@ export default function AnalyzePage() {
   const [isStarting, setIsStarting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [runsExhausted, setRunsExhausted] = useState(false);
+  const [exhaustedMessage, setExhaustedMessage] = useState<string | null>(null);
+  const [upgradeUrl, setUpgradeUrl] = useState("/dashboard/settings#account");
 
   // ------------------------------------------------------------------
   // Dry run on mount
@@ -270,6 +273,16 @@ export default function AnalyzePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ dryRun: true }),
       });
+      if (res.status === 403) {
+        const data = await res.json().catch(() => ({}));
+        setRunsExhausted(true);
+        setExhaustedMessage((data as { message?: string }).message ?? null);
+        if ((data as { upgrade_url?: string }).upgrade_url) {
+          setUpgradeUrl((data as { upgrade_url: string }).upgrade_url);
+        }
+        setPageState("IDLE");
+        return;
+      }
       if (!res.ok) throw new Error(`Server error: ${res.status}`);
       const data = await res.json();
       setDryRunSummary({
@@ -301,6 +314,15 @@ export default function AnalyzePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
+      if (res.status === 403) {
+        const data = await res.json().catch(() => ({}));
+        setRunsExhausted(true);
+        setExhaustedMessage((data as { message?: string }).message ?? null);
+        if ((data as { upgrade_url?: string }).upgrade_url) {
+          setUpgradeUrl((data as { upgrade_url: string }).upgrade_url);
+        }
+        return;
+      }
       if (res.status !== 202) throw new Error(`Unexpected status: ${res.status}`);
       const data = await res.json();
       setRunId(data.runId);
@@ -463,6 +485,21 @@ export default function AnalyzePage() {
             >
               Retry
             </button>
+          </div>
+        )}
+
+        {/* Runs exhausted */}
+        {runsExhausted && (
+          <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4">
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              {exhaustedMessage ?? "You\u2019ve reached your analysis run limit for this month."}
+            </p>
+            <a
+              href={upgradeUrl}
+              className="mt-2 inline-block text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
+            >
+              Upgrade for unlimited runs →
+            </a>
           </div>
         )}
 
