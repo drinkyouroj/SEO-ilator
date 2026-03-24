@@ -235,3 +235,13 @@
 
 ### Next
 - Phase 9: Deployment & Launch
+
+## 2026-03-24 — Phase 9: Launch & v1.0.0
+
+### Done
+- Landing page with hero, feature cards, and navigation (PR #17)
+- Groq embedding provider added (PR #16)
+- CHANGELOG.md updated with full v1.0.0 release notes
+- All documentation verified complete (README, CLAUDE.md, DECISION docs, build_log)
+- 280 tests passing, 0 type errors
+- Merged develop → main, tagged v1.0.0
