@@ -116,6 +116,19 @@ export async function processAnalysisRun(
       return new Map(rows.map((r: { id: string; body: string }) => [r.id, r.body]));
     };
 
+    // 6b. Load project strategy settings for crosslink thresholds
+    let strategySettings: Record<string, unknown> = {};
+    try {
+      const config = await prisma.strategyConfig.findUnique({
+        where: { projectId_strategyId: { projectId, strategyId: "crosslink" } },
+      });
+      if (config?.settings && typeof config.settings === "object") {
+        strategySettings = config.settings as Record<string, unknown>;
+      }
+    } catch {
+      // Continue with defaults if settings lookup fails
+    }
+
     // 7. Run strategies for each article, with heartbeat updates
     const allRecs: StrategyRecommendation[] = [];
     let skippedArticleCount = 0;
@@ -134,7 +147,7 @@ export async function processAnalysisRun(
         articleIndex: articles,
         loadArticleBodies,
         projectId,
-        settings: {},
+        settings: strategySettings,
       };
 
       try {
