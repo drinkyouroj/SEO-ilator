@@ -11,6 +11,11 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("[GlobalError]", error);
+    import("@sentry/nextjs").then((Sentry) => {
+      Sentry.captureException(error);
+    }).catch(() => {
+      // Sentry not available — already logged to console
+    });
   }, [error]);
 
   return (

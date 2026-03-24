@@ -11,6 +11,11 @@ export default function DashboardError({
 }) {
   useEffect(() => {
     console.error("[DashboardError]", error);
+    import("@sentry/nextjs").then((Sentry) => {
+      Sentry.captureException(error);
+    }).catch(() => {
+      // Sentry not available — already logged to console
+    });
   }, [error]);
 
   return (
