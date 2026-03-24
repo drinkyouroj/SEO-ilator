@@ -29,10 +29,6 @@ export async function POST(request: Request) {
   }
   const db = scopedPrisma(projectId);
 
-  // ── 1b. Rate limit [AAP-B9] ─────────────────────────────────────────────
-  const rateLimitResponse = checkRateLimit(userId, "POST", "/api/analyze");
-  if (rateLimitResponse) return rateLimitResponse;
-
   // ── 2. Parse body ─────────────────────────────────────────────────────────
   let body: z.infer<typeof BodySchema>;
   try {
@@ -46,6 +42,12 @@ export async function POST(request: Request) {
   }
 
   const { dryRun, enableSemantic } = body;
+
+  // ── 2b. Rate limit [AAP-B9] — only for real analysis runs, not dry-runs
+  if (!dryRun) {
+    const rateLimitResponse = checkRateLimit(userId, "POST", "/api/analyze");
+    if (rateLimitResponse) return rateLimitResponse;
+  }
 
   // ── 3. Plan checks ────────────────────────────────────────────────────────
   const analyzeCheck = await checkPlanLimits(projectId, "analyze");
