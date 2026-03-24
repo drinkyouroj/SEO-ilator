@@ -61,17 +61,23 @@ export function scopedPrisma(projectId: string) {
       model,
       {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        async $allOperations({ args, query }: { args: any; query: (args: any) => Promise<any> }) {
+        async $allOperations({ operation, args, query }: { operation: string; args: any; query: (args: any) => Promise<any> }) {
           // Ensure args exists
           if (!args) args = {};
 
-          // For read/update/delete ops: create where if missing, always inject projectId
-          if (!args.where) args.where = {};
-          if (typeof args.where === "object") {
-            args.where.projectId = projectId;
+          // Only inject `where` for operations that support it (not create/createMany/upsert.create)
+          const opsWithWhere = [
+            "findFirst", "findMany", "findUnique", "findFirstOrThrow", "findUniqueOrThrow",
+            "update", "updateMany", "delete", "deleteMany", "count", "aggregate", "groupBy",
+          ];
+          if (opsWithWhere.includes(operation)) {
+            if (!args.where) args.where = {};
+            if (typeof args.where === "object") {
+              args.where.projectId = projectId;
+            }
           }
 
-          // For single-record create: inject projectId into data
+          // For single-record create/upsert: inject projectId into data
           if (args.data && typeof args.data === "object" && !Array.isArray(args.data)) {
             args.data.projectId = projectId;
           }
@@ -82,6 +88,13 @@ export function scopedPrisma(projectId: string) {
               if (typeof record === "object" && record !== null) {
                 record.projectId = projectId;
               }
+            }
+          }
+
+          // For upsert: also inject into the where clause
+          if (operation === "upsert" && args.where) {
+            if (typeof args.where === "object") {
+              args.where.projectId = projectId;
             }
           }
 
