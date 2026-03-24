@@ -258,6 +258,10 @@ async function upsertArticle(
       httpStatus: normalized.metadata.httpStatus,
     },
   });
-  await invalidateEmbedding(existing.id);
+  try {
+    await invalidateEmbedding(existing.id);
+  } catch (err) {
+    console.warn(`[upload] Article ${existing.id} saved but embedding invalidation failed:`, err);
+  }
   return { didCreate: false, didUpdate: true, skipped: false };
 }

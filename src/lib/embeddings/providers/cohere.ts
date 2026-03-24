@@ -33,6 +33,19 @@ export class CohereEmbeddingProvider implements EmbeddingProvider {
     }
 
     const data = await response.json();
+
+    if (
+      !data.embeddings ||
+      !Array.isArray(data.embeddings.float) ||
+      data.embeddings.float.length !== texts.length
+    ) {
+      throw new Error(
+        `Cohere API returned unexpected response shape. ` +
+        `Expected embeddings.float array of length ${texts.length}, ` +
+        `got: ${JSON.stringify(data.embeddings ? Object.keys(data.embeddings) : data).slice(0, 200)}`
+      );
+    }
+
     return data.embeddings.float;
   }
 }

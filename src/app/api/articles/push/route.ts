@@ -103,11 +103,12 @@ export async function POST(request: Request) {
   try {
     const existing = await db.article.findUnique({
       where: { projectId_url: { projectId, url: normalized.url } },
-      select: { id: true, bodyHash: true },
+      select: { id: true, bodyHash: true, titleHash: true },
     });
 
     if (existing) {
-      if (existing.bodyHash === normalized.bodyHash) {
+      // Compare both hashes — title changes affect embeddings (title + body is the embed text)
+      if (existing.bodyHash === normalized.bodyHash && existing.titleHash === normalized.titleHash) {
         const article = await db.article.findUnique({
           where: { projectId_url: { projectId, url: normalized.url } },
         });
@@ -128,7 +129,11 @@ export async function POST(request: Request) {
           parseWarning: normalized.parseWarning,
         },
       });
-      await invalidateEmbedding(existing.id);
+      try {
+        await invalidateEmbedding(existing.id);
+      } catch (err) {
+        console.warn(`[push] Article ${existing.id} saved but embedding invalidation failed:`, err);
+      }
       return NextResponse.json({ article, changed: true }, { status: 200 });
     }
 

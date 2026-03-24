@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Hoist a single shared mock function so every new OpenAI() call shares it
 const mockCreate = vi.hoisted(() => vi.fn());
@@ -16,7 +16,12 @@ describe("OpenAIEmbeddingProvider", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("OPENAI_API_KEY", "test-openai-key");
     provider = new OpenAIEmbeddingProvider();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("returns_embeddings_with_correct_dimensions", async () => {

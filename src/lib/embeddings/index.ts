@@ -23,8 +23,17 @@ export async function getProvider(
     },
   });
 
+  // Validate settings shape if config exists
+  const rawProvider = (config?.settings as Record<string, unknown>)?.provider;
+  if (config && typeof rawProvider !== "string") {
+    console.warn(
+      `[embeddings] StrategyConfig for project ${projectId} has invalid settings shape. ` +
+      `Expected { provider: string }, got: ${JSON.stringify(config.settings)}. Falling back to env/default.`
+    );
+  }
+
   const modelId =
-    (config?.settings as { provider?: string })?.provider ??
+    (typeof rawProvider === "string" ? rawProvider : null) ??
     process.env.EMBEDDING_PROVIDER ??
     DEFAULT_PROVIDER;
 

@@ -119,7 +119,11 @@ async function processSyncJob(
             },
           });
 
-          await invalidateEmbedding(upserted.id);
+          try {
+            await invalidateEmbedding(upserted.id);
+          } catch (err) {
+            console.warn(`[articles] Article ${upserted.id} saved but embedding invalidation failed:`, err);
+          }
 
           await completeTask(
             taskId,

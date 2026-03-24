@@ -69,20 +69,29 @@ export async function processEmbeddings(
 
     const vectors = await provider.embed(texts);
 
-    // Persist each embedding via raw SQL for pgvector compatibility
-    for (let j = 0; j < batch.length; j++) {
-      const article = batch[j];
-      const paddedVector = zeroPad(vectors[j], STORAGE_DIMENSIONS);
-      const vectorStr = `[${paddedVector.join(",")}]`;
-
-      await prisma.$executeRawUnsafe(
-        'UPDATE "Article" SET "embedding" = $1::vector, "embeddingModel" = $2 WHERE "id" = $3',
-        vectorStr,
-        provider.modelId,
-        article.id
+    // Validate: provider must return exactly one vector per input text
+    if (vectors.length !== texts.length) {
+      throw new Error(
+        `Embedding provider "${provider.modelId}" returned ${vectors.length} vectors ` +
+        `for ${texts.length} texts. This indicates a provider bug or API issue.`
       );
-      generated++;
     }
+
+    // Persist all embeddings in this chunk atomically — if one fails, none are written
+    await prisma.$transaction(async (tx) => {
+      for (let j = 0; j < batch.length; j++) {
+        const article = batch[j];
+        const paddedVector = zeroPad(vectors[j], STORAGE_DIMENSIONS);
+        const vectorStr = `[${paddedVector.join(",")}]`;
+
+        await tx.$executeRaw`
+          UPDATE "Article"
+          SET "embedding" = ${vectorStr}::vector, "embeddingModel" = ${provider.modelId}
+          WHERE "id" = ${article.id}
+        `;
+      }
+    });
+    generated += batch.length;
   }
 
   return { cached: cached.length, generated, skipped };

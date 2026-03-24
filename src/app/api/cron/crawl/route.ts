@@ -188,7 +188,11 @@ export async function GET(request: Request) {
                 },
               });
 
-              await invalidateEmbedding(upserted.id);
+              try {
+                await invalidateEmbedding(upserted.id);
+              } catch (err) {
+                console.warn(`[cron/crawl] Article ${upserted.id} saved but embedding invalidation failed:`, err);
+              }
 
               await completeTask(
                 taskId,

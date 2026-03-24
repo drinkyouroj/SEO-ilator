@@ -1,10 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock prisma before importing the module under test
+// Capture tx.$executeRaw calls across transactions for assertions
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const txExecuteRawCalls: any[][] = [];
+
 vi.mock("@/lib/db", () => ({
   prisma: {
     $executeRaw: vi.fn(),
     $executeRawUnsafe: vi.fn(),
+    // processEmbeddings wraps per-chunk writes in a transaction
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    $transaction: vi.fn(async (fn: (tx: any) => Promise<unknown>) => {
+      const mockTxExecuteRaw = vi.fn().mockResolvedValue(1);
+      const tx = { $executeRaw: mockTxExecuteRaw };
+      const result = await fn(tx);
+      // Capture all calls for test assertions
+      for (const call of mockTxExecuteRaw.mock.calls) {
+        txExecuteRawCalls.push(call);
+      }
+      return result;
+    }),
   },
 }));
 
@@ -14,7 +30,6 @@ vi.mock("@/lib/embeddings/cache", () => ({
 }));
 
 import { processEmbeddings } from "@/lib/embeddings/batch";
-import { prisma } from "@/lib/db";
 import { checkEmbeddingCache } from "@/lib/embeddings/cache";
 import type { ArticleWithEmbedding, EmbeddingProvider } from "@/lib/embeddings/types";
 import type { CacheCheckResult } from "@/lib/embeddings/types";
@@ -39,11 +54,10 @@ const makeProvider = (overrides?: Partial<EmbeddingProvider>): EmbeddingProvider
 });
 
 const mockCheckCache = vi.mocked(checkEmbeddingCache);
-const mockExecuteRawUnsafe = vi.mocked(prisma.$executeRawUnsafe);
 
 beforeEach(() => {
+  txExecuteRawCalls.length = 0;
   vi.clearAllMocks();
-  mockExecuteRawUnsafe.mockResolvedValue(1);
 });
 
 describe("processEmbeddings", () => {
@@ -57,7 +71,7 @@ describe("processEmbeddings", () => {
     const result = await processEmbeddings("project-1", [article], provider, hashes);
 
     expect(provider.embed).not.toHaveBeenCalled();
-    expect(mockExecuteRawUnsafe).not.toHaveBeenCalled();
+    expect(txExecuteRawCalls).toHaveLength(0);
     expect(result.cached).toBe(1);
     expect(result.generated).toBe(0);
     expect(result.skipped).toBe(0);
@@ -76,10 +90,16 @@ describe("processEmbeddings", () => {
 
     await processEmbeddings("project-1", [article], provider, hashes);
 
-    expect(mockExecuteRawUnsafe).toHaveBeenCalledOnce();
-    const vectorArg: string = mockExecuteRawUnsafe.mock.calls[0][1] as string;
-    // Parse the stored vector string
-    const storedVector: number[] = JSON.parse(vectorArg);
+    // One article = one tx.$executeRaw call
+    expect(txExecuteRawCalls).toHaveLength(1);
+    // Tagged template: first arg is TemplateStringsArray, subsequent args are interpolated values
+    // The vectorStr is the first interpolated value
+    const call = txExecuteRawCalls[0];
+    const vectorStr = call[0].values?.[0] ?? call[1]; // Handle both tagged template forms
+    // Parse the stored vector string to verify padding
+    const storedVector: number[] = JSON.parse(
+      typeof vectorStr === "string" ? vectorStr : String(vectorStr)
+    );
     expect(storedVector).toHaveLength(1536);
     // First 1024 values should be the provider output
     expect(storedVector[0]).toBeCloseTo(0.1);
@@ -93,12 +113,13 @@ describe("processEmbeddings", () => {
     const articles = Array.from({ length: 5 }, (_, i) =>
       makeArticle({ id: `art-${i + 1}`, title: `Title ${i + 1}`, body: `Body ${i + 1}` })
     );
+    const vec = () => Array.from({ length: 1536 }, () => 0.1);
     const provider = makeProvider({
       batchSize: 2,
-      embed: vi.fn().mockResolvedValue([
-        Array.from({ length: 1536 }, () => 0.1),
-        Array.from({ length: 1536 }, () => 0.2),
-      ]),
+      embed: vi.fn()
+        .mockResolvedValueOnce([vec(), vec()])   // batch 1: 2 articles
+        .mockResolvedValueOnce([vec(), vec()])   // batch 2: 2 articles
+        .mockResolvedValueOnce([vec()]),          // batch 3: 1 article (remainder)
     });
     const hashes = new Map<string, { bodyHash: string; titleHash: string }>();
 

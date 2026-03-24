@@ -9,6 +9,9 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
   private client: OpenAI;
 
   constructor() {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY environment variable is required");
+    }
     this.client = new OpenAI();
   }
 
