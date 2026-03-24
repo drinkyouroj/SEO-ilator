@@ -6,6 +6,7 @@ import { scopedPrisma } from "@/lib/db";
 import { parseHTML, parseMarkdown } from "@/lib/ingestion/parser";
 import { normalizeArticle } from "@/lib/ingestion/normalizer";
 import type { ParsedArticle } from "@/lib/ingestion/types";
+import { invalidateEmbedding } from "@/lib/embeddings/batch";
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +128,7 @@ export async function POST(request: Request) {
           parseWarning: normalized.parseWarning,
         },
       });
+      await invalidateEmbedding(existing.id);
       return NextResponse.json({ article, changed: true }, { status: 200 });
     }
 

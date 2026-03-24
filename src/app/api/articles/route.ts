@@ -9,6 +9,7 @@ import { parseHTML } from "@/lib/ingestion/parser";
 import { normalizeArticle } from "@/lib/ingestion/normalizer";
 import { RobotsCache } from "@/lib/ingestion/robots";
 import { PRESET_DELAYS, type CrawlPreset } from "@/lib/ingestion/types";
+import { invalidateEmbedding } from "@/lib/embeddings/batch";
 
 export const dynamic = "force-dynamic";
 
@@ -86,7 +87,7 @@ async function processSyncJob(
           const normalized = normalizeArticle(parsed, projectId, "crawl");
 
           // Upsert Article — use base prisma with explicit projectId (matches cron worker pattern)
-          await prisma.article.upsert({
+          const upserted = await prisma.article.upsert({
             where: {
               projectId_url: { projectId, url: normalized.url },
             },
@@ -117,6 +118,8 @@ async function processSyncJob(
               httpStatus: crawlResult.httpStatus,
             },
           });
+
+          await invalidateEmbedding(upserted.id);
 
           await completeTask(
             taskId,
