@@ -70,4 +70,30 @@ describe("settingsUpdateSchema", () => {
     expect(result.success).toBe(true);
     expect(result.data).toEqual({ maxLinksPerPage: 20 });
   });
+
+  it("rejects_fuzzyTolerance_below_0.6", () => {
+    const result = settingsUpdateSchema.safeParse({ fuzzyTolerance: 0.5 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.fuzzyTolerance).toBeDefined();
+    }
+  });
+
+  it("rejects_fuzzyTolerance_above_1.0", () => {
+    const result = settingsUpdateSchema.safeParse({ fuzzyTolerance: 1.1 });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.fuzzyTolerance).toBeDefined();
+    }
+  });
+
+  it("rejects_maxLinksPerPage_below_1", () => {
+    const result = settingsUpdateSchema.safeParse({ maxLinksPerPage: 0 });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects_maxLinksPerPage_above_50", () => {
+    const result = settingsUpdateSchema.safeParse({ maxLinksPerPage: 51 });
+    expect(result.success).toBe(false);
+  });
 });

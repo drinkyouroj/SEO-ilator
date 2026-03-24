@@ -257,7 +257,8 @@ export default function AnalyzePage() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [runsExhausted, setRunsExhausted] = useState(false);
-  const [canUseSemantic] = useState(true);
+  const [exhaustedMessage, setExhaustedMessage] = useState<string | null>(null);
+  const [upgradeUrl, setUpgradeUrl] = useState("/dashboard/settings#account");
 
   // ------------------------------------------------------------------
   // Dry run on mount
@@ -273,7 +274,12 @@ export default function AnalyzePage() {
         body: JSON.stringify({ dryRun: true }),
       });
       if (res.status === 403) {
+        const data = await res.json().catch(() => ({}));
         setRunsExhausted(true);
+        setExhaustedMessage((data as { message?: string }).message ?? null);
+        if ((data as { upgrade_url?: string }).upgrade_url) {
+          setUpgradeUrl((data as { upgrade_url: string }).upgrade_url);
+        }
         setPageState("IDLE");
         return;
       }
@@ -309,7 +315,12 @@ export default function AnalyzePage() {
         body: JSON.stringify({}),
       });
       if (res.status === 403) {
+        const data = await res.json().catch(() => ({}));
         setRunsExhausted(true);
+        setExhaustedMessage((data as { message?: string }).message ?? null);
+        if ((data as { upgrade_url?: string }).upgrade_url) {
+          setUpgradeUrl((data as { upgrade_url: string }).upgrade_url);
+        }
         return;
       }
       if (res.status !== 202) throw new Error(`Unexpected status: ${res.status}`);
@@ -481,10 +492,10 @@ export default function AnalyzePage() {
         {runsExhausted && (
           <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4">
             <p className="text-sm text-amber-800 dark:text-amber-200">
-              You&apos;ve reached your analysis run limit for this month.
+              {exhaustedMessage ?? "You\u2019ve reached your analysis run limit for this month."}
             </p>
             <a
-              href="/dashboard/settings#account"
+              href={upgradeUrl}
               className="mt-2 inline-block text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 focus-visible:ring-2 focus-visible:ring-blue-500 rounded"
             >
               Upgrade for unlimited runs →

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 export default function DashboardError({
   error,
   reset,
@@ -7,6 +9,10 @@ export default function DashboardError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    console.error("[DashboardError]", error);
+  }, [error]);
+
   return (
     <div className="flex items-center justify-center p-8">
       <div className="max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-center dark:border-red-800 dark:bg-red-900/20">
@@ -14,7 +20,7 @@ export default function DashboardError({
           Something went wrong
         </h2>
         <p className="mt-2 text-sm text-red-600 dark:text-red-300">
-          Our team has been notified. Try refreshing the page.
+          An unexpected error occurred. Try refreshing the page.
         </p>
         {error.digest && (
           <p className="mt-1 text-xs text-red-400 dark:text-red-500">

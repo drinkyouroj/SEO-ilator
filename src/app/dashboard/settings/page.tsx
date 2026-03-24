@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { ThresholdSlider } from "@/components/forms/ThresholdSlider";
 
 interface SettingsData {
@@ -20,6 +20,14 @@ interface UserPlan {
 }
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
+
+function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T {
+  let timer: ReturnType<typeof setTimeout>;
+  return ((...args: Parameters<T>) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  }) as T;
+}
 
 /**
  * Settings page with three sections:
@@ -81,6 +89,10 @@ export default function SettingsPage() {
     []
   );
 
+  // Debounced save for slider/input changes (500ms)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedSave = useMemo(() => debounce(saveSettings, 500), [saveSettings]);
+
   // [AAP-B6] Provider switch confirmation handler
   const handleProviderChange = useCallback(
     (provider: "openai" | "cohere") => {
@@ -94,13 +106,11 @@ export default function SettingsPage() {
 
   const confirmProviderSwitch = useCallback(() => {
     if (pendingProvider) {
+      // Don't optimistically update provider — let saveSettings sync from server on success
       saveSettings({
         embeddingProvider: pendingProvider,
         forceReEmbed: true,
       });
-      setSettings((prev) =>
-        prev ? { ...prev, embeddingProvider: pendingProvider } : prev
-      );
     }
     setShowProviderWarning(false);
     setPendingProvider(null);
@@ -118,7 +128,12 @@ export default function SettingsPage() {
         <p className="text-red-500">{error}</p>
       </div>
     );
-  if (!settings) return null;
+  if (!settings)
+    return (
+      <div className="p-6">
+        <p className="text-red-500">Settings could not be loaded. Please refresh the page.</p>
+      </div>
+    );
 
   return (
     <div className="space-y-8 p-6 max-w-3xl">
@@ -151,7 +166,7 @@ export default function SettingsPage() {
             setSettings((prev) =>
               prev ? { ...prev, similarityThreshold: v } : prev
             );
-            saveSettings({ similarityThreshold: v });
+            debouncedSave({ similarityThreshold: v });
           }}
           description="Minimum cosine similarity score for semantic matching. Higher values produce fewer but more relevant recommendations."
         />
@@ -167,7 +182,7 @@ export default function SettingsPage() {
             setSettings((prev) =>
               prev ? { ...prev, fuzzyTolerance: v } : prev
             );
-            saveSettings({ fuzzyTolerance: v });
+            debouncedSave({ fuzzyTolerance: v });
           }}
           description="String similarity threshold for keyword matching. 1.0 = exact match only."
         />
@@ -191,7 +206,7 @@ export default function SettingsPage() {
               setSettings((prev) =>
                 prev ? { ...prev, maxLinksPerPage: v } : prev
               );
-              saveSettings({ maxLinksPerPage: v });
+              debouncedSave({ maxLinksPerPage: v });
             }}
             className="w-24 rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-white focus-visible:ring-2 focus-visible:ring-blue-500"
           />
@@ -218,7 +233,7 @@ export default function SettingsPage() {
                       setSettings((prev) =>
                         prev ? { ...prev, defaultApproaches: next } : prev
                       );
-                      saveSettings({ defaultApproaches: next });
+                      debouncedSave({ defaultApproaches: next });
                     }
                   }}
                   className="rounded border-gray-300 focus-visible:ring-2 focus-visible:ring-blue-500"
@@ -233,6 +248,7 @@ export default function SettingsPage() {
       {/* ── AdvancedSection (collapsible) ── */}
       <section aria-labelledby="advanced-heading">
         <button
+          id="advanced-heading"
           onClick={() => setAdvancedOpen(!advancedOpen)}
           className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded"
           aria-expanded={advancedOpen}

@@ -9,8 +9,9 @@ export async function GET() {
   let projectId: string;
   try {
     ({ projectId } = await requireAuth());
-  } catch (response) {
-    return response as Response;
+  } catch (thrown) {
+    if (thrown instanceof Response) return thrown;
+    throw thrown;
   }
 
   try {
@@ -38,8 +39,9 @@ export async function PUT(request: NextRequest) {
   let projectId: string;
   try {
     ({ projectId } = await requireAuth());
-  } catch (response) {
-    return response as Response;
+  } catch (thrown) {
+    if (thrown instanceof Response) return thrown;
+    throw thrown;
   }
 
   try {
@@ -60,15 +62,15 @@ export async function PUT(request: NextRequest) {
 
     const update = result.data;
 
+    // Fetch existing config once — used for AAP-B6 check and merge
+    const existing = await prisma.strategyConfig.findUnique({
+      where: { projectId_strategyId: { projectId, strategyId: "crosslink" } },
+    });
+    const currentSettings = (existing?.settings as Record<string, unknown>) ?? {};
+
     // [AAP-B6] If embedding provider is changing, require forceReEmbed confirmation
     if (update.embeddingProvider) {
-      const existing = await prisma.strategyConfig.findUnique({
-        where: { projectId_strategyId: { projectId, strategyId: "crosslink" } },
-      });
-
-      const currentProvider =
-        (existing?.settings as Record<string, unknown>)?.embeddingProvider ??
-        DEFAULT_SETTINGS.embeddingProvider;
+      const currentProvider = currentSettings.embeddingProvider ?? DEFAULT_SETTINGS.embeddingProvider;
 
       if (update.embeddingProvider !== currentProvider && !update.forceReEmbed) {
         return NextResponse.json(
@@ -87,30 +89,45 @@ export async function PUT(request: NextRequest) {
     // Strip forceReEmbed from persisted settings (it is a one-time flag)
     const { forceReEmbed, ...settingsToPersist } = update;
 
+    // Merge with existing settings so partial updates don't wipe other fields
+    const mergedSettings = { ...DEFAULT_SETTINGS, ...currentSettings, ...settingsToPersist };
+
     const config = await prisma.strategyConfig.upsert({
       where: { projectId_strategyId: { projectId, strategyId: "crosslink" } },
       create: {
         projectId,
         strategyId: "crosslink",
-        settings: { ...DEFAULT_SETTINGS, ...settingsToPersist },
+        settings: mergedSettings,
       },
       update: {
-        settings: settingsToPersist,
+        settings: mergedSettings,
       },
     });
 
     // If forceReEmbed was requested, clear all article embeddings for this project
+    // Isolated from the settings save — settings are already persisted at this point
+    let embeddingsCleared = false;
     if (forceReEmbed) {
-      await prisma.$executeRaw`
-        UPDATE "Article"
-        SET embedding = NULL, "embeddingModel" = NULL
-        WHERE "projectId" = ${projectId}
-      `;
+      try {
+        await prisma.$executeRaw`
+          UPDATE "Article"
+          SET embedding = NULL, "embeddingModel" = NULL
+          WHERE "projectId" = ${projectId}
+        `;
+        embeddingsCleared = true;
+      } catch (clearErr) {
+        console.error("[api/settings] Failed to clear embeddings after provider switch:", clearErr);
+        return NextResponse.json({
+          settings: config.settings,
+          embeddingsCleared: false,
+          warning: "Settings saved but embedding cache could not be cleared. Please retry.",
+        });
+      }
     }
 
     return NextResponse.json({
       settings: config.settings,
-      embeddingsCleared: forceReEmbed ?? false,
+      embeddingsCleared,
     });
   } catch (err) {
     console.error("[api/settings] PUT failed:", err);

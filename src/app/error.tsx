@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 export default function GlobalError({
   error,
   reset,
@@ -7,6 +9,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    console.error("[GlobalError]", error);
+  }, [error]);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
       <div className="max-w-md text-center">
@@ -14,7 +20,7 @@ export default function GlobalError({
           Something went wrong
         </h2>
         <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-          Our team has been notified. Try refreshing the page.
+          An unexpected error occurred. Try refreshing the page.
         </p>
         {error.digest && (
           <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
