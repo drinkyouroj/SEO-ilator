@@ -179,7 +179,6 @@ async function fetchAndParse(
   const isUrlset = $("urlset").length > 0;
 
   if (isUrlset) {
-    const beforeCount = collected.length;
     let hitLimit = false;
     $("urlset > url > loc").each((_, el) => {
       if (collected.length >= MAX_URLS) {

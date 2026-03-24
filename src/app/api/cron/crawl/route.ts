@@ -163,7 +163,9 @@ export async function GET(request: Request) {
                   bodyHash: normalized.bodyHash,
                   titleHash: normalized.titleHash,
                   wordCount: normalized.wordCount,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma Json fields require cast
                   existingLinks: normalized.existingLinks as any,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   metadata: normalized.metadata as any,
                   sourceType: normalized.sourceType,
                   parseWarning: normalized.parseWarning,
@@ -175,7 +177,9 @@ export async function GET(request: Request) {
                   bodyHash: normalized.bodyHash,
                   titleHash: normalized.titleHash,
                   wordCount: normalized.wordCount,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Prisma Json fields require cast
                   existingLinks: normalized.existingLinks as any,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   metadata: normalized.metadata as any,
                   sourceType: normalized.sourceType,
                   parseWarning: normalized.parseWarning,
