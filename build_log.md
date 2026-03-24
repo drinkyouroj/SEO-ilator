@@ -132,3 +132,33 @@
 
 ### Next
 - Phase 5: Crosslink Strategy & Analysis
+
+## 2026-03-24 — Phase 5: Crosslink Strategy & Analysis
+
+### Done
+- SEOStrategy interface with ArticleSummary (no body text) [AAP-B7] and loadArticleBodies callback
+- StrategyRegistry: register, unregister, getStrategy, analyzeWithAll
+- CrosslinkStrategy: keyword matching (exact + Dice fuzzy), semantic matching (pgvector findSimilarArticles)
+- 12 quality safeguards: self-link, existing link, noindex, error pages, max links, generic anchors, min/max anchor length, DOM-aware zones, min source words, min distinctive words
+- Title prefix stripping and distinctive word coverage [AAP-O6]
+- Conservative defaults for null existingLinks (assume 5) [AAP-O7]
+- XSS sanitization on anchor text derived from crawled article titles
+- Dedup-ranker: merge keyword+semantic matches with +0.15 confidence boost, per-page cap
+- Re-analysis scope: preserve accepted, skip dismissed if unchanged, supersede pending [AAP-B4]
+- Analysis orchestrator: chunked processing with lastHeartbeatAt liveness signal, embedding processing, FK violation handling [AAP-B7/B10]
+- POST /api/analyze: dryRun mode for cost estimation [AAP-O8], 202 Accepted, plan limit checks, P2002 → 409
+- Analysis cron worker: zombie recovery with lastHeartbeatAt (10 min threshold) [AAP-F4], FOR UPDATE SKIP LOCKED
+- Runs API: list, detail, cancel endpoints [AAP-F4]
+- Schema migration: lastHeartbeatAt field + AAP-B3 partial unique index on AnalysisRun
+- 31 new tests (crosslink 17, registry 2, dedup 4, re-analysis 5, orchestrator 3)
+
+### Decisions
+- Crosslink strategy combines keyword and semantic in one class (not separate strategies)
+- Semantic matching skipped when source article has no embedding, threshold 0.751 for strict > 0.75
+- lastHeartbeatAt prevents zombie recovery from killing legitimate long-running analyses
+- AAP-B3 partial unique index prevents concurrent active analysis runs at database level
+- Anchor text sanitized against XSS from crawled article titles
+- On-demand cron trigger via after() — same pattern as Phase 3 crawl
+
+### Next
+- Phase 6: Recommendations UI & Export
