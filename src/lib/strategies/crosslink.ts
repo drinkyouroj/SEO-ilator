@@ -190,11 +190,16 @@ export class CrosslinkStrategy implements SEOStrategy {
     if (article.hasEmbedding && recommendations.length < maxNew) {
       const keywordTargetIds = new Set(recommendations.map((r) => r.targetArticleId));
 
+      // Use similarity threshold from settings, or default 0.65
+      const threshold = typeof context.settings?.similarityThreshold === "number"
+        ? context.settings.similarityThreshold
+        : 0.65;
+
       const similarArticles = await findSimilarArticles(
         context.projectId,
         article.id,
         20,
-        0.751,
+        threshold,
       );
 
       // Build a lookup map for the article index
