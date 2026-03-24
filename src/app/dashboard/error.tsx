@@ -13,8 +13,8 @@ export default function DashboardError({
     console.error("[DashboardError]", error);
     import("@sentry/nextjs").then((Sentry) => {
       Sentry.captureException(error);
-    }).catch(() => {
-      // Sentry not available — already logged to console
+    }).catch((sentryErr) => {
+      console.warn("[DashboardError] Failed to report to Sentry:", sentryErr);
     });
   }, [error]);
 

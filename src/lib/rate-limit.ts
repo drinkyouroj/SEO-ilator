@@ -140,6 +140,8 @@ export function checkRateLimit(
     return null;
   }
 
+  console.warn(`[rate-limit] Denied ${method} ${path} for user ${userId} (retry after ${result.retryAfterSeconds}s)`);
+
   return new NextResponse(
     JSON.stringify({
       error: "Too Many Requests",

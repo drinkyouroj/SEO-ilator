@@ -13,8 +13,8 @@ export default function GlobalError({
     console.error("[GlobalError]", error);
     import("@sentry/nextjs").then((Sentry) => {
       Sentry.captureException(error);
-    }).catch(() => {
-      // Sentry not available — already logged to console
+    }).catch((sentryErr) => {
+      console.warn("[GlobalError] Failed to report to Sentry:", sentryErr);
     });
   }, [error]);
 
