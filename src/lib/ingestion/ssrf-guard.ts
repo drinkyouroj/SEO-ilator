@@ -43,10 +43,13 @@ export async function validateUrl(url: string): Promise<UrlValidationResult> {
     return { safe: false, reason: `DNS returned no addresses for ${parsed.hostname}` };
   }
 
-  const ip = addresses[0];
-  if (isPrivateIp(ip)) {
-    return { safe: false, reason: `Resolved to private IP: ${ip}` };
+  // Check ALL resolved IPs — an attacker could put a public IP first
+  // and a private IP second; fetch() may connect to any of them
+  for (const ip of addresses) {
+    if (isPrivateIp(ip)) {
+      return { safe: false, reason: `Resolved to private IP: ${ip}` };
+    }
   }
 
-  return { safe: true, resolvedIp: ip };
+  return { safe: true, resolvedIp: addresses[0] };
 }

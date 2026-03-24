@@ -115,7 +115,7 @@ export async function claimTasks(jobId: string, batchSize: number): Promise<stri
   const ids = tasks.map((t) => t.id);
 
   // CAS update: only rows still in "pending" with retryAfter <= now will match
-  await prisma.ingestionTask.updateMany({
+  const result = await prisma.ingestionTask.updateMany({
     where: {
       id: { in: ids },
       status: "pending",
@@ -130,7 +130,16 @@ export async function claimTasks(jobId: string, batchSize: number): Promise<stri
     },
   });
 
-  return ids;
+  // If all IDs were claimed, return them directly
+  if (result.count === ids.length) return ids;
+
+  // Some tasks were claimed by another worker — re-query for the ones we got
+  if (result.count === 0) return [];
+  const claimed = await prisma.ingestionTask.findMany({
+    where: { id: { in: ids }, status: "processing", startedAt: now },
+    select: { id: true },
+  });
+  return claimed.map((t) => t.id);
 }
 
 /**
@@ -180,7 +189,12 @@ export async function failTask(
       select: { retryCount: true },
     });
 
-    const retryCount = task?.retryCount ?? MAX_RETRIES;
+    if (!task) {
+      console.error(`[queue] failTask called for non-existent task: ${taskId}`);
+      return;
+    }
+
+    const retryCount = task.retryCount;
     const canRetry = isTransient && retryCount < MAX_RETRIES;
 
     if (canRetry) {
@@ -267,10 +281,14 @@ export async function recoverZombies(): Promise<void> {
     }
 
     for (const [jobId, count] of jobGroups) {
-      await prisma.ingestionJob.update({
-        where: { id: jobId },
-        data: { failedUrls: { increment: count } },
-      });
+      try {
+        await prisma.ingestionJob.update({
+          where: { id: jobId },
+          data: { failedUrls: { increment: count } },
+        });
+      } catch (err) {
+        console.error(`[queue] Failed to update failedUrls for job ${jobId}:`, err);
+      }
     }
   }
 }

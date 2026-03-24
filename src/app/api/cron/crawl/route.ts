@@ -224,9 +224,19 @@ export async function GET(request: Request) {
       elapsedMs: Date.now() - startTime,
     });
   } catch (error) {
-    console.error("[cron/crawl] Fatal error:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[cron/crawl] Fatal error:", {
+      message,
+      summary,
+      elapsedMs: Date.now() - startTime,
+    }, error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      {
+        error: "Cron worker failed",
+        message,
+        summary,
+        elapsedMs: Date.now() - startTime,
+      },
       { status: 500 }
     );
   }
