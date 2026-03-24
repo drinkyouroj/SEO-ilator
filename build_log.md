@@ -188,3 +188,26 @@
 
 ### Next
 - Phase 7: Settings, Polish
+
+## 2026-03-24 — Phase 7: Settings, Polish
+
+### Done
+- Settings validation schema (settingsUpdateSchema) with constraints for all strategy parameters
+- Settings API (GET/PUT) with zod validation, default settings fallback, AAP-B6 provider switch confirmation
+- ThresholdSlider component with clamping, ARIA attributes, disabled state
+- Settings page: StrategySettingsSection (sliders, max links, approach checkboxes), AdvancedSection (provider switch with confirmation dialog), AccountSection (plan badge, usage stats, upgrade CTA)
+- Tier limit UI: lock icon placeholder, runs exhausted message, upgrade_url in 403 responses
+- Global and dashboard error boundaries (error.tsx)
+- Loading skeletons for articles, runs, analyze, settings pages [AAP-F9]
+- Responsive touch targets (min-h-[44px]) on all interactive elements [AAP-F6]
+- Accessibility: focus-visible:ring-2 on all buttons/links, aria-labels on icon-only buttons, aria-current on active nav, aria-label on severity/status badges
+- 22 new tests (settings schema 7, settings API 6, ThresholdSlider 3, responsive 3, accessibility 3), 230 total
+
+### Decisions
+- Settings use StrategyConfig model with JSON settings field (per-project, per-strategy)
+- Provider switch requires forceReEmbed confirmation (clears article embeddings via raw SQL)
+- Sidebar already had mobile slide-over from Phase 2; Phase 7 added touch targets and ARIA
+- Error boundaries use Client Success messaging pattern
+
+### Next
+- Phase 8: Performance & Optimization
