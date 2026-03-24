@@ -8,7 +8,9 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock helper for Prisma
 function mockSimilarityQuery(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   prisma: any,
   sourceEmbedding: string | null,
   similarResults: Array<{ id: string; url: string; title: string; similarity: number }>
@@ -17,6 +19,7 @@ function mockSimilarityQuery(
     vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([]);
   } else {
     vi.mocked(prisma.$queryRaw).mockResolvedValueOnce([{ embedding: sourceEmbedding }]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(prisma.$transaction).mockImplementationOnce(async (fn: any) => {
       const tx = {
         $executeRaw: vi.fn().mockResolvedValue(0),

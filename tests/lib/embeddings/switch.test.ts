@@ -13,6 +13,7 @@ describe("switchProvider", () => {
 
   it("clears_all_embeddings_and_updates_config", async () => {
     const { prisma } = await import("@/lib/db");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(prisma.$transaction).mockImplementation(async (fn: any) => {
       const tx = {
         $executeRaw: vi.fn().mockResolvedValue(10),
