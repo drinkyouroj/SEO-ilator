@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   const analyzeCheck = await checkPlanLimits(projectId, "analyze");
   if (!analyzeCheck.allowed) {
     return NextResponse.json(
-      { error: "PLAN_LIMIT_EXCEEDED", message: analyzeCheck.message },
+      { error: "PLAN_LIMIT_EXCEEDED", message: analyzeCheck.message, upgrade_url: "/dashboard/settings#account" },
       { status: 403 }
     );
   }
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     const semanticCheck = await checkPlanLimits(projectId, "analyze_semantic");
     if (!semanticCheck.allowed) {
       return NextResponse.json(
-        { error: "PLAN_LIMIT_EXCEEDED", message: semanticCheck.message },
+        { error: "PLAN_LIMIT_EXCEEDED", message: semanticCheck.message, upgrade_url: "/dashboard/settings#account" },
         { status: 403 }
       );
     }
