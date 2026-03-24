@@ -20,8 +20,10 @@ const MIN_SOURCE_WORDS = 50;
 const MIN_DISTINCTIVE_WORDS = 3;
 const DISTINCTIVE_COVERAGE = 0.6;
 const DEFAULT_MAX_NEW_RECS = 10;
-const NULL_LINKS_ESTIMATE = 5;
 const DICE_THRESHOLD = 0.8;
+
+/** Matches a 2-letter language prefix at the start of a URL path, e.g. /de/academy → /academy */
+const LANG_PREFIX_RE = /^\/[a-z]{2}(?=\/)/;
 
 const GENERIC_ANCHORS = new Set([
   "click here",
@@ -122,6 +124,29 @@ export function findInBody(
   return { found: true, offset, context };
 }
 
+/**
+ * Normalize a URL for dedup comparison:
+ * - Resolve relative paths against the base URL
+ * - Strip trailing slashes
+ * - Strip 2-letter language prefixes (/de/academy/... → /academy/...)
+ * - Remove fragments and query params
+ */
+export function normalizeUrlForDedup(href: string, baseUrl: string): string {
+  try {
+    const resolved = new URL(href, baseUrl);
+    let pathname = resolved.pathname;
+    // Remove trailing slash
+    if (pathname.endsWith("/") && pathname.length > 1) {
+      pathname = pathname.slice(0, -1);
+    }
+    // Strip language prefix (e.g., /de/academy/... → /academy/...)
+    pathname = pathname.replace(LANG_PREFIX_RE, "");
+    return resolved.origin + pathname;
+  } catch {
+    return href;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // CrosslinkStrategy
 // ---------------------------------------------------------------------------
@@ -146,11 +171,12 @@ export class CrosslinkStrategy implements SEOStrategy {
     const sourceBody = bodyMap.get(article.id);
     if (!sourceBody) return [];
 
-    // Determine existing link URLs for dedup
+    // Determine existing link URLs for dedup (normalized to catch relative paths
+    // and language variants like /de/academy/... that resolve to the same article)
     const existingLinkUrls = new Set<string>();
     if (article.existingLinks !== null) {
       for (const link of article.existingLinks) {
-        existingLinkUrls.add(link.href);
+        existingLinkUrls.add(normalizeUrlForDedup(link.href, article.url));
       }
     }
 
@@ -176,8 +202,8 @@ export class CrosslinkStrategy implements SEOStrategy {
       // Skip error pages (4xx/5xx)
       if (target.httpStatus !== null && target.httpStatus >= 400) continue;
 
-      // Skip already-linked targets
-      if (existingLinkUrls.has(target.url)) continue;
+      // Skip already-linked targets (normalize target URL for comparison)
+      if (existingLinkUrls.has(normalizeUrlForDedup(target.url, target.url))) continue;
 
       const rec = this.matchTarget(article, target, sourceBody);
       if (rec) {
