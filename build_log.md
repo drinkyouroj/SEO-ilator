@@ -235,3 +235,21 @@
 
 ### Next
 - Phase 9: Deployment & Launch
+
+## 2026-03-24 — Phase 9: Launch Preparation & v1.0.0
+
+### Done
+- Release branch `release/v1.0.0` created from develop
+- All 276 tests passing, 0 type errors on release branch
+- CHANGELOG.md updated with v1.0.0 entry (Added + Security sections)
+- Production infrastructure provisioning checklist prepared
+- Monitoring configuration checklist prepared
+- QA checklist prepared
+
+### Pending (requires manual action)
+- Railway PostgreSQL production instance with pgvector + PgBouncer
+- Vercel domain + DNS + SSL configuration
+- Google/GitHub OAuth production credentials + Resend domain
+- Sentry production DSN, OpenAI/Railway alerts, uptime + cron monitors
+- Full QA checklist on production deployment
+- Merge release/v1.0.0 → main, tag v1.0.0
