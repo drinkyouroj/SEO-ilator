@@ -140,9 +140,10 @@ model AnalysisRun {
   embeddingsCached    Int      @default(0)
   embeddingsGenerated Int      @default(0)
 
-  error       String? @db.Text
-  startedAt   DateTime?
-  completedAt DateTime?
+  error           String?   @db.Text
+  startedAt       DateTime?
+  completedAt     DateTime?
+  lastHeartbeatAt DateTime?
 
   project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
   recommendations Recommendation[]
