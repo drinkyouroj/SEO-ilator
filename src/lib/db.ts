@@ -65,37 +65,31 @@ export function scopedPrisma(projectId: string) {
           // Ensure args exists
           if (!args) args = {};
 
-          // Only inject `where` for operations that support it (not create/createMany/upsert.create)
-          const opsWithWhere = [
-            "findFirst", "findMany", "findUnique", "findFirstOrThrow", "findUniqueOrThrow",
-            "update", "updateMany", "delete", "deleteMany", "count", "aggregate", "groupBy",
-          ];
-          if (opsWithWhere.includes(operation)) {
-            if (!args.where) args.where = {};
-            if (typeof args.where === "object") {
-              args.where.projectId = projectId;
+          // Operations that MUST NOT get a where clause injected
+          const isCreate = operation === "create" || operation === "createMany" || operation === "createManyAndReturn";
+
+          if (isCreate) {
+            // For single-record create: inject projectId into data only
+            if (args.data && typeof args.data === "object" && !Array.isArray(args.data)) {
+              args.data.projectId = projectId;
             }
-          }
-
-          // For single-record create/upsert: inject projectId into data
-          if (args.data && typeof args.data === "object" && !Array.isArray(args.data)) {
-            args.data.projectId = projectId;
-          }
-
-          // For createMany: inject projectId into each record
-          if (Array.isArray(args.data)) {
-            for (const record of args.data) {
-              if (typeof record === "object" && record !== null) {
-                record.projectId = projectId;
+            // For createMany: inject projectId into each record
+            if (Array.isArray(args.data)) {
+              for (const record of args.data) {
+                if (typeof record === "object" && record !== null) {
+                  record.projectId = projectId;
+                }
               }
             }
+            // Explicitly remove where if somehow present (defensive)
+            delete args.where;
+            return query(args);
           }
 
-          // For upsert: also inject into the where clause
-          if (operation === "upsert" && args.where) {
-            if (typeof args.where === "object") {
-              args.where.projectId = projectId;
-            }
+          // All other operations: inject where clause
+          if (!args.where) args.where = {};
+          if (typeof args.where === "object") {
+            args.where.projectId = projectId;
           }
 
           return query(args);
