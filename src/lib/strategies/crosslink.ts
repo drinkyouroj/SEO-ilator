@@ -124,21 +124,42 @@ export function findInBody(
   return { found: true, offset, context };
 }
 
+/** Max words for semantic anchor text — keeps it concise and keyword-focused */
+const MAX_ANCHOR_WORDS = 6;
+
 /**
  * Build concise anchor text for semantic matches.
- * Strips site name suffixes (e.g., " - Poultryscales"), common title prefixes,
- * and sanitizes the result. Returns empty string if unusable.
+ * Strips site name suffixes, common title prefixes, and extracts a
+ * keyword-focused phrase (up to MAX_ANCHOR_WORDS). Good anchor text
+ * is descriptive but concise — not the entire page title.
  */
 export function buildSemanticAnchorText(title: string): string {
   // Strip site name suffix (common pattern: " - Site Name" or " | Site Name")
   let text = title.replace(/\s*[-|]\s*[^-|]+$/, "");
   // If stripping removed everything, fall back to original
   if (!text.trim()) text = title;
-  // Strip common title prefixes
+  // Strip common title prefixes ("How to ...", "A guide to ...", etc.)
   text = stripTitlePrefix(text);
   // Sanitize
   text = sanitizeAnchorText(text);
+  if (!text) return "";
+  // Truncate to MAX_ANCHOR_WORDS for concise anchor text
+  const words = text.split(/\s+/);
+  if (words.length > MAX_ANCHOR_WORDS) {
+    text = words.slice(0, MAX_ANCHOR_WORDS).join(" ");
+  }
+  // Lowercase for natural anchor text (SEO best practice)
+  text = text.toLowerCase();
   return text;
+}
+
+/**
+ * Build a clean display title for semantic match recommendations.
+ * Strips site name suffix but keeps the full title for context.
+ */
+export function buildSemanticDisplayTitle(title: string): string {
+  const text = title.replace(/\s*[-|]\s*[^-|]+$/, "");
+  return text.trim() || title;
 }
 
 /**
@@ -279,8 +300,7 @@ export class CrosslinkStrategy implements SEOStrategy {
         const severity: "critical" | "warning" | "info" =
           confidence >= 0.85 ? "critical" : confidence >= 0.6 ? "warning" : "info";
 
-        // Use cleaned title (without site suffix) for the display title
-        const displayTitle = target.title.replace(/\s*[-|]\s*[^-|]+$/, "") || target.title;
+        const displayTitle = buildSemanticDisplayTitle(target.title);
 
         recommendations.push({
           strategyId: this.id,
