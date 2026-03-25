@@ -7,6 +7,7 @@ import { ErrorBanner } from "@/components/feedback/ErrorBanner";
 import { apiFetch } from "@/lib/api-client";
 
 type IngestStatus = "idle" | "submitting" | "success" | "error";
+type TriggerStatus = "idle" | "triggering" | "triggered" | "error";
 
 interface FeedbackState {
   status: IngestStatus;
@@ -14,6 +15,33 @@ interface FeedbackState {
 }
 
 export default function IngestPage() {
+  // ── Manual trigger ───────────────────────────────────────────────────────
+  const [crawlTrigger, setCrawlTrigger] = useState<TriggerStatus>("idle");
+  const [analyzeTrigger, setAnalyzeTrigger] = useState<TriggerStatus>("idle");
+
+  const handleTrigger = useCallback(async (job: "crawl" | "analyze") => {
+    const setter = job === "crawl" ? setCrawlTrigger : setAnalyzeTrigger;
+    setter("triggering");
+    try {
+      const res = await apiFetch("/api/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ job }),
+      });
+      if (!res.ok) throw new Error("Trigger failed");
+      setter("triggered");
+      setTimeout(() => setter("idle"), 5000);
+    } catch {
+      setter("error");
+      setTimeout(() => setter("idle"), 5000);
+    }
+  }, []);
+
+  // Auto-trigger crawl after successful ingestion submission
+  const triggerCrawl = useCallback(() => {
+    if (crawlTrigger === "idle") handleTrigger("crawl");
+  }, [crawlTrigger, handleTrigger]);
+
   // ── Sitemap form ──────────────────────────────────────────────────────────
   const [sitemapUrl, setSitemapUrl] = useState("");
   const [sitemapFeedback, setSitemapFeedback] = useState<FeedbackState>({
@@ -36,9 +64,10 @@ export default function IngestPage() {
       }
       setSitemapFeedback({
         status: "success",
-        message: "Sitemap crawl started successfully.",
+        message: "Sitemap submitted. Processing will start shortly.",
       });
       setSitemapUrl("");
+      triggerCrawl();
     } catch (err) {
       setSitemapFeedback({
         status: "error",
@@ -73,9 +102,10 @@ export default function IngestPage() {
       }
       setUrlListFeedback({
         status: "success",
-        message: `Crawl started for ${urls.length} URL${urls.length === 1 ? "" : "s"}.`,
+        message: `${urls.length} URL${urls.length === 1 ? "" : "s"} submitted. Processing will start shortly.`,
       });
       setUrlList("");
+      triggerCrawl();
     } catch (err) {
       setUrlListFeedback({
         status: "error",
@@ -261,6 +291,49 @@ export default function IngestPage() {
             Upload Files
           </button>
           <FeedbackMessage feedback={uploadFeedback} />
+        </section>
+
+        {/* ── Manual Triggers ──────────────────────────────────────────── */}
+        <section className="rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-900">
+          <h2 className="mb-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Process Jobs
+          </h2>
+          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
+            Manually trigger background jobs. These also run automatically on a schedule.
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleTrigger("crawl")}
+              disabled={crawlTrigger === "triggering"}
+              className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              {crawlTrigger === "triggering" && <Spinner size={14} />}
+              {crawlTrigger === "triggered" ? "Crawl Triggered" : "Process Crawl Queue"}
+            </button>
+            <button
+              onClick={() => handleTrigger("analyze")}
+              disabled={analyzeTrigger === "triggering"}
+              className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+            >
+              {analyzeTrigger === "triggering" && <Spinner size={14} />}
+              {analyzeTrigger === "triggered" ? "Analysis Triggered" : "Run Analysis"}
+            </button>
+          </div>
+          {crawlTrigger === "triggered" && (
+            <p className="mt-3 text-sm font-medium text-green-700 dark:text-green-400">
+              Crawl job triggered. Check the Articles page for progress.
+            </p>
+          )}
+          {analyzeTrigger === "triggered" && (
+            <p className="mt-3 text-sm font-medium text-green-700 dark:text-green-400">
+              Analysis triggered. Check the Runs page for progress.
+            </p>
+          )}
+          {(crawlTrigger === "error" || analyzeTrigger === "error") && (
+            <p className="mt-3 text-sm font-medium text-red-700 dark:text-red-400">
+              Failed to trigger job. Please try again.
+            </p>
+          )}
         </section>
       </div>
     </PageContainer>
