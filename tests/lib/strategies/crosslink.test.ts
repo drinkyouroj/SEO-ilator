@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ArticleSummary, AnalysisContext, StrategyRecommendation } from "@/lib/strategies/types";
-import { CrosslinkStrategy, normalizeUrlForDedup, buildSemanticAnchorText } from "@/lib/strategies/crosslink";
+import { CrosslinkStrategy, normalizeUrlForDedup, buildSemanticAnchorText, buildSemanticDisplayTitle } from "@/lib/strategies/crosslink";
 import { findSimilarArticles } from "@/lib/embeddings/similarity";
 
 vi.mock("@/lib/embeddings/similarity", () => ({
@@ -407,34 +407,50 @@ describe("normalizeUrlForDedup", () => {
 });
 
 describe("buildSemanticAnchorText", () => {
-  it("strips_site_name_suffix_with_dash", () => {
+  it("strips_suffix_and_lowercases", () => {
     expect(buildSemanticAnchorText("How Poultry Weighing Works - Poultryscales")).toBe(
-      "How Poultry Weighing Works"
+      "how poultry weighing works"
     );
   });
 
-  it("strips_site_name_suffix_with_pipe", () => {
+  it("strips_suffix_with_pipe", () => {
     expect(buildSemanticAnchorText("Broiler Growth Data | FarmTech Blog")).toBe(
-      "Broiler Growth Data"
+      "broiler growth data"
     );
   });
 
-  it("strips_title_prefix_after_site_name", () => {
-    expect(buildSemanticAnchorText("How to Weigh Chickens Accurately - Poultryscales")).toBe(
-      "Weigh Chickens Accurately"
+  it("strips_title_prefix_and_truncates", () => {
+    expect(buildSemanticAnchorText("How to Weigh Chickens Accurately and Efficiently Every Day - Poultryscales")).toBe(
+      "weigh chickens accurately and efficiently every"
     );
   });
 
-  it("handles_title_without_suffix", () => {
-    expect(buildSemanticAnchorText("Fluctuations in the growth curve of chickens")).toBe(
-      "Fluctuations in the growth curve of chickens"
+  it("truncates_long_titles_to_6_words", () => {
+    expect(buildSemanticAnchorText("Fluctuations in the growth curve of chickens and possible causes")).toBe(
+      "fluctuations in the growth curve of"
+    );
+  });
+
+  it("keeps_short_titles_intact", () => {
+    expect(buildSemanticAnchorText("Feed mixture and growth")).toBe(
+      "feed mixture and growth"
     );
   });
 
   it("sanitizes_xss_from_title", () => {
     const result = buildSemanticAnchorText('<script>alert("x")</script>Poultry Guide');
     expect(result).not.toMatch(/<script>/i);
-    expect(result).toContain("Poultry Guide");
+    expect(result).toContain("poultry guide");
+  });
+});
+
+describe("buildSemanticDisplayTitle", () => {
+  it("strips_site_suffix_for_display", () => {
+    expect(buildSemanticDisplayTitle("Poultry Growth - Poultryscales")).toBe("Poultry Growth");
+  });
+
+  it("keeps_full_title_without_suffix", () => {
+    expect(buildSemanticDisplayTitle("Feed mixture and growth")).toBe("Feed mixture and growth");
   });
 });
 
