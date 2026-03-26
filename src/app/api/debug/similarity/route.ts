@@ -136,6 +136,8 @@ export async function GET() {
       trace.recommendations = recs.slice(0, 5).map((r) => ({
         target: r.targetArticleId,
         title: r.title,
+        anchorText: r.anchorText,
+        sourceContext: r.sourceContext?.slice(0, 100),
         approach: r.matchingApproach,
         confidence: r.confidence,
       }));
