@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { requireAuth } from "@/lib/auth/session";
 import { checkPlanLimits } from "@/lib/auth/plan-guard";
-import { scopedPrisma } from "@/lib/db";
+import { prisma, scopedPrisma } from "@/lib/db";
 import { getProvider } from "@/lib/embeddings";
 import { checkEmbeddingCache } from "@/lib/embeddings/cache";
 import { Prisma } from "@prisma/client";
@@ -41,7 +41,24 @@ export async function POST(request: Request) {
     );
   }
 
-  const { dryRun, enableSemantic } = body;
+  const { dryRun } = body;
+
+  // ── 2a. Resolve enableSemantic from request body or project settings
+  let enableSemantic = body.enableSemantic;
+  if (!enableSemantic) {
+    try {
+      const config = await prisma.strategyConfig.findUnique({
+        where: { projectId_strategyId: { projectId, strategyId: "crosslink" } },
+      });
+      const settings = config?.settings as Record<string, unknown> | null;
+      const approaches = settings?.defaultApproaches;
+      if (Array.isArray(approaches) && approaches.includes("semantic")) {
+        enableSemantic = true;
+      }
+    } catch {
+      // Settings lookup failed — continue with default (no semantic)
+    }
+  }
 
   // ── 2b. Rate limit [AAP-B9] — only for real analysis runs, not dry-runs
   if (!dryRun) {

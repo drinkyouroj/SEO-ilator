@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ArticleSummary, AnalysisContext, StrategyRecommendation } from "@/lib/strategies/types";
-import { CrosslinkStrategy } from "@/lib/strategies/crosslink";
+import { CrosslinkStrategy, normalizeUrlForDedup, findSemanticAnchorText, buildSemanticDisplayTitle } from "@/lib/strategies/crosslink";
 import { findSimilarArticles } from "@/lib/embeddings/similarity";
 
 vi.mock("@/lib/embeddings/similarity", () => ({
@@ -143,10 +143,10 @@ describe("CrosslinkStrategy", () => {
 
   // 6
   it("enforces_minimum_word_count_for_sources", async () => {
-    const source = makeArticle({ id: "src", wordCount: 100 });
+    const source = makeArticle({ id: "src", wordCount: 30 });
     const target = makeArticle({ id: "tgt", title: "React Hooks Guide" });
     const bodies = {
-      src: "React Hooks Guide is great. " + "word ".repeat(50),
+      src: "React Hooks Guide is great. " + "word ".repeat(20),
     };
     const ctx = makeContext(source, [source, target], bodies);
 
@@ -209,7 +209,7 @@ describe("CrosslinkStrategy", () => {
   });
 
   // 11
-  it("uses_conservative_defaults_when_existingLinks_is_null", async () => {
+  it("still_produces_recs_when_existingLinks_is_null", async () => {
     const targets: ArticleSummary[] = [];
     const bodyParts: string[] = [];
     for (let i = 0; i < 12; i++) {
@@ -225,13 +225,13 @@ describe("CrosslinkStrategy", () => {
 
     const recs = await strategy.analyze(ctx);
 
-    // With null existingLinks assumed as 5, max new = 10, so at most 5 new links (10 - 5 = 5)
-    expect(recs.length).toBeLessThanOrEqual(5);
+    // maxNew defaults to DEFAULT_MAX_NEW_RECS (10) — existingLinks no longer reduces budget
+    expect(recs.length).toBeLessThanOrEqual(10);
     expect(recs.length).toBeGreaterThan(0);
   });
 
   // 12
-  it("respects_max_links_per_page", async () => {
+  it("respects_maxLinksPerPage_from_settings", async () => {
     const targets: ArticleSummary[] = [];
     const bodyParts: string[] = [];
     for (let i = 0; i < 20; i++) {
@@ -243,11 +243,33 @@ describe("CrosslinkStrategy", () => {
     const bodies = {
       src: bodyParts.join(" ") + " " + "word ".repeat(300),
     };
-    const ctx = makeContext(source, [source, ...targets], bodies);
+    // Set maxLinksPerPage to 3 via settings
+    const ctx = makeContext(source, [source, ...targets], bodies, { maxLinksPerPage: 3 });
 
     const recs = await strategy.analyze(ctx);
 
-    expect(recs.length).toBeLessThanOrEqual(10);
+    expect(recs.length).toBeLessThanOrEqual(3);
+    expect(recs.length).toBeGreaterThan(0);
+  });
+
+  // 12b
+  it("produces_recs_for_articles_with_many_existing_links", async () => {
+    const existingLinks = Array.from({ length: 50 }, (_, i) => ({
+      href: `https://example.com/existing-${i}`,
+      anchorText: `Existing Link ${i}`,
+    }));
+    const source = makeArticle({ id: "src", wordCount: 5000, existingLinks });
+    const target = makeArticle({ id: "tgt", title: "React Hooks Guide" });
+    const bodies = {
+      src: "Learn about building apps. You should read the React Hooks Guide to understand state management. " + "word ".repeat(300),
+    };
+    const ctx = makeContext(source, [source, target], bodies);
+
+    const recs = await strategy.analyze(ctx);
+
+    // Articles with many existing links should still get recommendations
+    const rec = recs.find((r) => r.targetArticleId === "tgt");
+    expect(rec).toBeDefined();
   });
 
   // 13
@@ -345,5 +367,142 @@ describe("CrosslinkStrategy — semantic matching", () => {
     const recs = await strategy.analyze(ctx);
     const semantic = recs.filter((r) => r.matchingApproach === "semantic");
     expect(semantic).toHaveLength(0);
+  });
+});
+
+describe("normalizeUrlForDedup", () => {
+  it("resolves_relative_paths_against_base_url", () => {
+    expect(
+      normalizeUrlForDedup("/academy/some-article", "https://example.com/academy/other")
+    ).toBe("https://example.com/academy/some-article");
+  });
+
+  it("strips_trailing_slashes", () => {
+    expect(
+      normalizeUrlForDedup("https://example.com/academy/article/", "https://example.com")
+    ).toBe("https://example.com/academy/article");
+  });
+
+  it("strips_language_prefix_from_path", () => {
+    expect(
+      normalizeUrlForDedup("/de/academy/some-article", "https://example.com/page")
+    ).toBe("https://example.com/academy/some-article");
+  });
+
+  it("strips_language_prefix_from_absolute_urls", () => {
+    expect(
+      normalizeUrlForDedup("https://example.com/fr/academy/article", "https://example.com")
+    ).toBe("https://example.com/academy/article");
+  });
+
+  it("returns_original_href_for_unparseable_urls", () => {
+    expect(normalizeUrlForDedup("not-a-url", "also-not-a-url")).toBe("not-a-url");
+  });
+
+  it("preserves_absolute_urls_without_language_prefix", () => {
+    expect(
+      normalizeUrlForDedup("https://example.com/academy/article", "https://example.com")
+    ).toBe("https://example.com/academy/article");
+  });
+});
+
+describe("findSemanticAnchorText", () => {
+  it("finds_relevant_phrase_in_source_body", () => {
+    const body = "Our farm improved efficiency by using automated sorting equipment to grade birds. This reduced labor costs significantly.";
+    const result = findSemanticAnchorText("How Poultry Sorting Equipment Boosts Profits - Poultryscales", body);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.length).toBeLessThan(body.length);
+  });
+
+  it("falls_back_to_title_keywords_when_no_body_match", () => {
+    const body = "This article discusses completely unrelated topics about database optimization.";
+    const result = findSemanticAnchorText("How Poultry Sorting Equipment Boosts Profits - Poultryscales", body);
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.toLowerCase()).toContain("poultry");
+  });
+
+  it("strips_site_suffix_before_matching", () => {
+    const body = "Feed mixture composition plays a critical role in growth rates.";
+    const result = findSemanticAnchorText("Feed mixture and its structure to maximize growth - Poultryscales", body);
+    expect(result).not.toContain("Poultryscales");
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("sanitizes_xss_from_title", () => {
+    const result = findSemanticAnchorText('<script>alert("x")</script>Poultry Guide', "Some body text about poultry guide topics.");
+    expect(result).not.toMatch(/<script>/i);
+  });
+
+  it("produces_concise_phrase_not_full_sentence", () => {
+    const body = "When weighing poultry flocks you need accurate sorting equipment to classify birds by weight and grade them efficiently for market.";
+    const result = findSemanticAnchorText("Poultry Sorting Equipment Guide", body);
+    const wordCount = result.split(/\s+/).length;
+    expect(wordCount).toBeLessThanOrEqual(8);
+    expect(wordCount).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("buildSemanticDisplayTitle", () => {
+  it("strips_site_suffix_for_display", () => {
+    expect(buildSemanticDisplayTitle("Poultry Growth - Poultryscales")).toBe("Poultry Growth");
+  });
+
+  it("keeps_full_title_without_suffix", () => {
+    expect(buildSemanticDisplayTitle("Feed mixture and growth")).toBe("Feed mixture and growth");
+  });
+});
+
+describe("CrosslinkStrategy — URL dedup", () => {
+  const strategy = new CrosslinkStrategy();
+
+  beforeEach(() => {
+    idCounter = 0;
+    vi.mocked(findSimilarArticles).mockResolvedValue([]);
+  });
+
+  it("skips_targets_linked_via_relative_paths", async () => {
+    const target = makeArticle({
+      id: "tgt",
+      title: "React Hooks Guide",
+      url: "https://example.com/academy/react-hooks-guide",
+    });
+    const source = makeArticle({
+      id: "src",
+      url: "https://example.com/academy/source-article",
+      wordCount: 500,
+      existingLinks: [{ href: "/academy/react-hooks-guide", anchorText: "Hooks" }],
+    });
+    const bodies = {
+      src: "Read the React Hooks Guide for more info on hooks. " + "word ".repeat(300),
+    };
+    const ctx = makeContext(source, [source, target], bodies);
+
+    const recs = await strategy.analyze(ctx);
+
+    const rec = recs.find((r) => r.targetArticleId === "tgt");
+    expect(rec).toBeUndefined();
+  });
+
+  it("skips_targets_linked_via_language_variant_paths", async () => {
+    const target = makeArticle({
+      id: "tgt",
+      title: "React Hooks Guide",
+      url: "https://example.com/academy/react-hooks-guide",
+    });
+    const source = makeArticle({
+      id: "src",
+      url: "https://example.com/academy/source-article",
+      wordCount: 500,
+      existingLinks: [{ href: "/de/academy/react-hooks-guide", anchorText: "Hooks (DE)" }],
+    });
+    const bodies = {
+      src: "Read the React Hooks Guide for more info on hooks. " + "word ".repeat(300),
+    };
+    const ctx = makeContext(source, [source, target], bodies);
+
+    const recs = await strategy.analyze(ctx);
+
+    const rec = recs.find((r) => r.targetArticleId === "tgt");
+    expect(rec).toBeUndefined();
   });
 });

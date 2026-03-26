@@ -3,11 +3,11 @@
   "crons": [
     {
       "path": "/api/cron/crawl",
-      "schedule": "0 1 * * *"
+      "schedule": "0 */6 * * *"
     },
     {
       "path": "/api/cron/analyze",
-      "schedule": "0 2 * * *"
+      "schedule": "0 1,7,13,19 * * *"
     },
     {
       "path": "/api/cron/cleanup-sessions",

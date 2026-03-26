@@ -61,28 +61,35 @@ export function scopedPrisma(projectId: string) {
       model,
       {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        async $allOperations({ args, query }: { args: any; query: (args: any) => Promise<any> }) {
+        async $allOperations({ operation, args, query }: { operation: string; args: any; query: (args: any) => Promise<any> }) {
           // Ensure args exists
           if (!args) args = {};
 
-          // For read/update/delete ops: create where if missing, always inject projectId
+          // Operations that MUST NOT get a where clause injected
+          const isCreate = operation === "create" || operation === "createMany" || operation === "createManyAndReturn";
+
+          if (isCreate) {
+            // For single-record create: inject projectId into data only
+            if (args.data && typeof args.data === "object" && !Array.isArray(args.data)) {
+              args.data.projectId = projectId;
+            }
+            // For createMany: inject projectId into each record
+            if (Array.isArray(args.data)) {
+              for (const record of args.data) {
+                if (typeof record === "object" && record !== null) {
+                  record.projectId = projectId;
+                }
+              }
+            }
+            // Explicitly remove where if somehow present (defensive)
+            delete args.where;
+            return query(args);
+          }
+
+          // All other operations: inject where clause
           if (!args.where) args.where = {};
           if (typeof args.where === "object") {
             args.where.projectId = projectId;
-          }
-
-          // For single-record create: inject projectId into data
-          if (args.data && typeof args.data === "object" && !Array.isArray(args.data)) {
-            args.data.projectId = projectId;
-          }
-
-          // For createMany: inject projectId into each record
-          if (Array.isArray(args.data)) {
-            for (const record of args.data) {
-              if (typeof record === "object" && record !== null) {
-                record.projectId = projectId;
-              }
-            }
           }
 
           return query(args);
