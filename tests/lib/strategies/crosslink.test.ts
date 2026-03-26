@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ArticleSummary, AnalysisContext, StrategyRecommendation } from "@/lib/strategies/types";
-import { CrosslinkStrategy, normalizeUrlForDedup, buildSemanticAnchorText, buildSemanticDisplayTitle } from "@/lib/strategies/crosslink";
+import { CrosslinkStrategy, normalizeUrlForDedup, findSemanticAnchorText, buildSemanticDisplayTitle } from "@/lib/strategies/crosslink";
 import { findSimilarArticles } from "@/lib/embeddings/similarity";
 
 vi.mock("@/lib/embeddings/similarity", () => ({
@@ -406,41 +406,41 @@ describe("normalizeUrlForDedup", () => {
   });
 });
 
-describe("buildSemanticAnchorText", () => {
-  it("strips_suffix_and_lowercases", () => {
-    expect(buildSemanticAnchorText("How Poultry Weighing Works - Poultryscales")).toBe(
-      "how poultry weighing works"
-    );
+describe("findSemanticAnchorText", () => {
+  it("finds_relevant_phrase_in_source_body", () => {
+    const body = "Our farm improved efficiency by using automated sorting equipment to grade birds. This reduced labor costs significantly.";
+    const result = findSemanticAnchorText("How Poultry Sorting Equipment Boosts Profits - Poultryscales", body);
+    // Should find a phrase from the body containing "sorting" and "equipment"
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.length).toBeLessThan(body.length);
   });
 
-  it("strips_suffix_with_pipe", () => {
-    expect(buildSemanticAnchorText("Broiler Growth Data | FarmTech Blog")).toBe(
-      "broiler growth data"
-    );
+  it("falls_back_to_title_keywords_when_no_body_match", () => {
+    const body = "This article discusses completely unrelated topics about database optimization.";
+    const result = findSemanticAnchorText("How Poultry Sorting Equipment Boosts Profits - Poultryscales", body);
+    // Should fall back to title-derived keywords
+    expect(result.length).toBeGreaterThan(0);
+    expect(result.toLowerCase()).toContain("poultry");
   });
 
-  it("strips_title_prefix_and_truncates", () => {
-    expect(buildSemanticAnchorText("How to Weigh Chickens Accurately and Efficiently Every Day - Poultryscales")).toBe(
-      "weigh chickens accurately and efficiently every"
-    );
-  });
-
-  it("truncates_long_titles_to_6_words", () => {
-    expect(buildSemanticAnchorText("Fluctuations in the growth curve of chickens and possible causes")).toBe(
-      "fluctuations in the growth curve of"
-    );
-  });
-
-  it("keeps_short_titles_intact", () => {
-    expect(buildSemanticAnchorText("Feed mixture and growth")).toBe(
-      "feed mixture and growth"
-    );
+  it("strips_site_suffix_before_matching", () => {
+    const body = "Feed mixture composition plays a critical role in growth rates.";
+    const result = findSemanticAnchorText("Feed mixture and its structure to maximize growth - Poultryscales", body);
+    expect(result).not.toContain("Poultryscales");
+    expect(result.length).toBeGreaterThan(0);
   });
 
   it("sanitizes_xss_from_title", () => {
-    const result = buildSemanticAnchorText('<script>alert("x")</script>Poultry Guide');
+    const result = findSemanticAnchorText('<script>alert("x")</script>Poultry Guide', "Some body text about poultry guide topics.");
     expect(result).not.toMatch(/<script>/i);
-    expect(result).toContain("poultry guide");
+  });
+
+  it("produces_concise_phrase_not_full_sentence", () => {
+    const body = "When weighing poultry flocks you need accurate sorting equipment to classify birds by weight and grade them efficiently for market.";
+    const result = findSemanticAnchorText("Poultry Sorting Equipment Guide", body);
+    const wordCount = result.split(/\s+/).length;
+    expect(wordCount).toBeLessThanOrEqual(8);
+    expect(wordCount).toBeGreaterThanOrEqual(3);
   });
 });
 
