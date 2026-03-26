@@ -410,7 +410,6 @@ describe("findSemanticAnchorText", () => {
   it("finds_relevant_phrase_in_source_body", () => {
     const body = "Our farm improved efficiency by using automated sorting equipment to grade birds. This reduced labor costs significantly.";
     const result = findSemanticAnchorText("How Poultry Sorting Equipment Boosts Profits - Poultryscales", body);
-    // Should find a phrase from the body containing "sorting" and "equipment"
     expect(result.length).toBeGreaterThan(0);
     expect(result.length).toBeLessThan(body.length);
   });
@@ -418,7 +417,6 @@ describe("findSemanticAnchorText", () => {
   it("falls_back_to_title_keywords_when_no_body_match", () => {
     const body = "This article discusses completely unrelated topics about database optimization.";
     const result = findSemanticAnchorText("How Poultry Sorting Equipment Boosts Profits - Poultryscales", body);
-    // Should fall back to title-derived keywords
     expect(result.length).toBeGreaterThan(0);
     expect(result.toLowerCase()).toContain("poultry");
   });
