@@ -124,33 +124,86 @@ export function findInBody(
   return { found: true, offset, context };
 }
 
-/** Max words for semantic anchor text — keeps it concise and keyword-focused */
-const MAX_ANCHOR_WORDS = 6;
+/** Min/max words for extracted anchor text phrases */
+const MIN_ANCHOR_WORDS = 3;
+const MAX_ANCHOR_WORDS = 8;
 
 /**
- * Build concise anchor text for semantic matches.
- * Strips site name suffixes, common title prefixes, and extracts a
- * keyword-focused phrase (up to MAX_ANCHOR_WORDS). Good anchor text
- * is descriptive but concise — not the entire page title.
+ * Find a natural phrase in the source body that relates to the target article.
+ * Scans sentences for distinctive words from the target title, then extracts
+ * a concise phrase around the matching area. Falls back to a keyword phrase
+ * derived from the title if no body match is found.
  */
-export function buildSemanticAnchorText(title: string): string {
-  // Strip site name suffix (common pattern: " - Site Name" or " | Site Name")
-  let text = title.replace(/\s*[-|]\s*[^-|]+$/, "");
-  // If stripping removed everything, fall back to original
-  if (!text.trim()) text = title;
-  // Strip common title prefixes ("How to ...", "A guide to ...", etc.)
-  text = stripTitlePrefix(text);
-  // Sanitize
-  text = sanitizeAnchorText(text);
-  if (!text) return "";
-  // Truncate to MAX_ANCHOR_WORDS for concise anchor text
-  const words = text.split(/\s+/);
-  if (words.length > MAX_ANCHOR_WORDS) {
-    text = words.slice(0, MAX_ANCHOR_WORDS).join(" ");
+export function findSemanticAnchorText(
+  targetTitle: string,
+  sourceBody: string,
+): string {
+  const cleanTitle = targetTitle.replace(/\s*[-|]\s*[^-|]+$/, "").trim() || targetTitle;
+  const titleWords = getDistinctiveWords(cleanTitle);
+
+  if (titleWords.length === 0) return "";
+
+  // Split body into sentences
+  const sentences = sourceBody.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean);
+
+  // Score each sentence by how many distinctive title words it contains
+  let bestSentence = "";
+  let bestScore = 0;
+
+  for (const sentence of sentences) {
+    const sentenceWords = new Set(getDistinctiveWords(sentence));
+    let score = 0;
+    for (const tw of titleWords) {
+      if (sentenceWords.has(tw)) score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestSentence = sentence;
+    }
   }
-  // Lowercase for natural anchor text (SEO best practice)
-  text = text.toLowerCase();
-  return text;
+
+  // Need at least 2 matching distinctive words for a relevant sentence
+  if (bestScore >= 2 && bestSentence) {
+    const phrase = extractPhrase(bestSentence, titleWords);
+    if (phrase) return sanitizeAnchorText(phrase);
+  }
+
+  // Fallback: concise keyword phrase from title
+  const stripped = stripTitlePrefix(cleanTitle);
+  const words = stripped.split(/\s+/);
+  const fallback = words.slice(0, Math.min(MAX_ANCHOR_WORDS, words.length)).join(" ");
+  return sanitizeAnchorText(fallback).toLowerCase();
+}
+
+/**
+ * Extract a concise phrase (3-8 words) from a sentence centered around
+ * the area with the most matching distinctive words.
+ */
+function extractPhrase(sentence: string, targetWords: string[]): string {
+  const words = sentence.split(/\s+/);
+  if (words.length <= MAX_ANCHOR_WORDS) return sentence;
+
+  const targetSet = new Set(targetWords);
+
+  // Find the window with the highest concentration of target words
+  let bestStart = 0;
+  let bestCount = 0;
+
+  for (let start = 0; start <= words.length - MIN_ANCHOR_WORDS; start++) {
+    const end = Math.min(start + MAX_ANCHOR_WORDS, words.length);
+    let count = 0;
+    for (let i = start; i < end; i++) {
+      const clean = words[i].toLowerCase().replace(/[^a-z0-9]/g, "");
+      if (targetSet.has(clean)) count++;
+    }
+    if (count > bestCount) {
+      bestCount = count;
+      bestStart = start;
+    }
+  }
+
+  const endIdx = Math.min(bestStart + MAX_ANCHOR_WORDS, words.length);
+  return words.slice(bestStart, endIdx).join(" ");
 }
 
 /**
@@ -293,7 +346,7 @@ export class CrosslinkStrategy implements SEOStrategy {
         // Skip targets already found by keyword matching
         if (keywordTargetIds.has(similar.id)) continue;
 
-        const anchorText = buildSemanticAnchorText(target.title);
+        const anchorText = findSemanticAnchorText(target.title, sourceBody);
         if (!anchorText) continue;
 
         const confidence = similar.similarity;
@@ -301,6 +354,7 @@ export class CrosslinkStrategy implements SEOStrategy {
           confidence >= 0.85 ? "critical" : confidence >= 0.6 ? "warning" : "info";
 
         const displayTitle = buildSemanticDisplayTitle(target.title);
+        const bodyMatch = findInBody(sourceBody, anchorText);
 
         recommendations.push({
           strategyId: this.id,
@@ -311,6 +365,9 @@ export class CrosslinkStrategy implements SEOStrategy {
           title: `Link to "${displayTitle}"`,
           description: `Found semantically similar article (similarity: ${confidence.toFixed(2)}).`,
           anchorText,
+          sourceContext: bodyMatch?.context ?? undefined,
+          charOffsetStart: bodyMatch?.offset ?? undefined,
+          charOffsetEnd: bodyMatch ? bodyMatch.offset + anchorText.length : undefined,
           confidence,
           matchingApproach: "semantic",
           suggestion: {
