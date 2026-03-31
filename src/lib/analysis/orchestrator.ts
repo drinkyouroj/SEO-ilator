@@ -254,7 +254,7 @@ export async function processAnalysisRun(
           }
         }
       }
-    });
+    }, { timeout: 30_000 });
 
     // 10. Transition to "completed" — conditional update to avoid overwriting "cancelled"
     await prisma.$executeRaw`

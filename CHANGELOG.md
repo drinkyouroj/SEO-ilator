@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.3] — 2026-03-26
+
+### Added
+- Manual trigger buttons on Ingest page for crawl and analysis jobs (#37)
+- Auto-trigger crawl processing after sitemap/URL list submission (#37)
+- Standalone recommendations page for viewing run results (#29)
+- Contextual anchor text extraction from source article body for semantic matches (#40)
+
+### Fixed
+- scopedPrisma injecting `where` into `create` operations causing 500 errors (#28, #38)
+- Analyze page showing 0 recommendations — runs API now includes `recommendationsFound` (#38)
+- Rate limiting blocking dry-run requests (#25) and overly aggressive 5/hr limit (#26)
+- Crosslink strategy producing 0 recs for articles with 10+ existing links (#35)
+- URL normalization for dedup — relative paths and language-variant self-links now matched (#36)
+- Semantic similarity threshold not reading from project settings (#32)
+- MIN_SOURCE_WORDS too high (300→50) excluding most articles (#31)
+- Theme selector not working — CSS variables and Tailwind v4 class-based dark mode (#41)
+- ToastProvider missing from dashboard layout (#30)
+
+### Changed
+- Cron frequency increased to every 6 hours for crawl and analyze (requires Pro plan) (#37)
+- Semantic anchor text now extracts concise phrases from source body instead of echoing target title (#39, #40)
+- Site name suffixes stripped from recommendation display titles (#38)
+
+### Removed
+- Debug similarity endpoint (temporary diagnostic tool)
+
 ## [1.0.0] — 2026-03-24
 
 ### Added
