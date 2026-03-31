@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
   dryRun: z.boolean().optional().default(false),
-  enableSemantic: z.boolean().optional().default(false),
+  enableSemantic: z.boolean().optional(),
 });
 
 export async function POST(request: Request) {
@@ -44,19 +44,24 @@ export async function POST(request: Request) {
   const { dryRun } = body;
 
   // ── 2a. Resolve enableSemantic from request body or project settings
-  let enableSemantic = body.enableSemantic;
-  if (!enableSemantic) {
+  //   Priority: explicit request body value > project settings > default (true)
+  let enableSemantic: boolean;
+  if (body.enableSemantic !== undefined) {
+    enableSemantic = body.enableSemantic;
+  } else {
+    // Check project-level strategy settings
+    enableSemantic = true; // default: semantic enabled
     try {
       const config = await prisma.strategyConfig.findUnique({
         where: { projectId_strategyId: { projectId, strategyId: "crosslink" } },
       });
       const settings = config?.settings as Record<string, unknown> | null;
       const approaches = settings?.defaultApproaches;
-      if (Array.isArray(approaches) && approaches.includes("semantic")) {
-        enableSemantic = true;
+      if (Array.isArray(approaches)) {
+        enableSemantic = approaches.includes("semantic");
       }
     } catch {
-      // Settings lookup failed — continue with default (no semantic)
+      // Settings lookup failed — continue with default (semantic enabled)
     }
   }
 
